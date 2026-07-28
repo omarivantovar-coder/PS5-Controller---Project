@@ -1,0 +1,54 @@
+name: Compilar PS5-Controller.exe
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'PS5-Controller.ahk'
+      - '.github/workflows/build.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Descargar AutoHotkey v2 (portable)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.autohotkey.com/download/ahk-v2.zip" -OutFile "ahk.zip"
+          Expand-Archive -Path "ahk.zip" -DestinationPath "ahk"
+
+      - name: Compilar a .exe (standalone, 64-bit)
+        shell: pwsh
+        run: |
+          $ahk2exe = Get-ChildItem -Path "ahk" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1
+          if (-not $ahk2exe) { throw "No se encontro Ahk2Exe.exe dentro del paquete descargado." }
+
+          $base = Get-ChildItem -Path "ahk" -Recurse -Filter "*.bin" |
+                  Where-Object { $_.Name -match "64" -and $_.Name -match "Unicode" } |
+                  Select-Object -First 1
+          if (-not $base) { throw "No se encontro el base file de 64-bit dentro del paquete descargado." }
+
+          & $ahk2exe.FullName /in "PS5-Controller.ahk" /out "PS5-Controller.exe" /base $base.FullName
+          if (-not (Test-Path "PS5-Controller.exe")) { throw "La compilacion no genero PS5-Controller.exe" }
+
+      - name: Subir como artifact de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS5-Controller-exe
+          path: PS5-Controller.exe
+
+      - name: Publicar/actualizar Release "latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Build automatico (latest)
+          body: Compilado automaticamente desde el ultimo push a main. Commit ${{ github.sha }}.
+          make_latest: true
+          files: PS5-Controller.exe

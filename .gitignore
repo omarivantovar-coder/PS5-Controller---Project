@@ -1,0 +1,8 @@
+# Binarios compilados (se publican via GitHub Releases, no se versionan)
+*.exe
+
+# Carpetas de build temporales
+build/
+dist/
+ahk/
+ahk.zip
