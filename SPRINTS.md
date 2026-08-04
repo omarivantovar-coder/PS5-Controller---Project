@@ -75,14 +75,29 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
       portable no trae `Ahk2Exe.exe` de todos modos. Ahora descarga el
       interprete y el compilador (repo separado `AutoHotkey/Ahk2Exe`) desde
       GitHub Releases. Verificado localmente: compila y corre correctamente.
-- [ ] Confirmar que el workflow corregido compila bien en Actions (revisar
-      pestaña Actions tras este push)
-- [ ] Probar `ControlSend` contra un Target Manager real (no Friv)
+- [x] Confirmar que el workflow corregido compila bien en Actions (tag
+      `latest` publicado correctamente tras el push)
+- [x] Prueba real contra Target Manager (2026-08): `ControlSend` en segundo
+      plano no funciona — **hallazgo clave**: TM (tanto "Use Host Controller"
+      como "Keyboard Mapping") solo procesa input cuando su ventana tiene el
+      foco real de Windows, sin excepción y sin atajo técnico posible
+      (confirmado con tecla real a mano, con `Send` global, y comparado
+      contra Shell Shockers en navegador, que sí funciona en segundo plano)
+- [x] Fix: `EnviarATodasLasVentanas` ahora activa cada ventana enlazada antes
+      de mandarle cada tecla (down/up), en vez de mandar en segundo plano.
+      El input se "congela" en su último estado al perder el foco, asi que
+      no hace falta mantenerlo activo continuamente — el efecto se ve casi
+      simultaneo entre consolas. Costo: el PC queda ocupado ciclando
+      ventanas mientras Relay/Loop estan activos.
 - [ ] Confirmar/ajustar las equivalencias de teclado configuradas en el TM
-      contra las de `ActionMap` en el script (especialmente stick derecho)
+      contra las de `ActionMap` en el script (confirmado: Cross real = `L`,
+      no `Space` como estaba puesto — falta ajustar el resto de botones)
 - [ ] Ajustar deadzone/sensibilidad del stick según comportamiento real
 - [ ] Distribuir el `.exe` compilado a otros PCs de la empresa
 - [ ] Invitar colaboradores al repo (Settings → Collaborators)
+- [ ] Automatizar el toggle "Use Host Controller" ↔ "Keyboard Mapping" en TM
+      via `ControlClick` al iniciar/detener el Loop (pendiente: obtener el
+      identificador del checkbox con Window Spy, incluido con AutoHotkey)
 - [ ] Generar token/acceso para pruebas desde otro dispositivo
 
 ---

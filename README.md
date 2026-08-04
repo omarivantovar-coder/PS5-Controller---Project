@@ -2,8 +2,7 @@
 
 Herramienta de AutoHotkey v2 para QA de videojuegos: graba el input que le das
 a un personaje usando un control físico de Xbox (vía XInput) y lo reproduce en
-loop, en simultáneo, sobre múltiples ventanas de Target Manager (PS5) enlazadas
-en un panel — sin robar el foco de tu PC mientras corre.
+loop sobre múltiples ventanas de Target Manager (PS5) enlazadas en un panel.
 
 ## Por qué existe
 
@@ -23,12 +22,27 @@ manual repetitivo.
 2. **Enlazar ventanas**: marca la casilla de cualquier ventana abierta en la
    lista para enlazarla/desenlazarla como destino.
 3. **Relay en vivo / Loop**: el input (en vivo o grabado) se manda como
-   teclas equivalentes a cada ventana enlazada usando `ControlSend`, que no
-   activa la ventana ni te quita el foco — puedes seguir usando tu PC mientras
-   corre.
+   teclas equivalentes a cada ventana enlazada. El Target Manager de PS5 solo
+   procesa input (control USB o teclado) cuando su ventana tiene el foco real
+   de Windows — no hay forma de evitar esto, es como está diseñado TM, no una
+   limitación del script. Por eso el programa activa brevemente cada ventana
+   enlazada antes de mandarle cada tecla, y pasa a la siguiente. Como el
+   input se "congela" en su último estado al perder el foco, el efecto se ve
+   prácticamente simultáneo entre consolas aunque técnicamente se manden una
+   por una. **Mientras el Relay/Loop están activos, el PC queda ocupado
+   ciclando ventanas — no se puede usar para otra cosa en simultáneo.**
 4. **Vista avanzada**: ventana aparte (botón "Ver vista avanzada") con el
    detalle en vivo de cada botón/stick — se oscurece mientras está
    presionado. Útil para depurar, no hace falta para el uso diario.
+
+## Configuración necesaria en Target Manager
+
+Cada sesión de TM que se vaya a usar con Grabar/Loop necesita tener activado
+**Keyboard Mapping** (no "Use Host Controller") — de lo contrario TM no
+procesa ninguna tecla, real o simulada. "Use Host Controller" sigue siendo
+útil para jugar en vivo con el control físico directo (sin este programa),
+pero no acepta input grabado/reproducido — solo el control físico en tiempo
+real.
 
 ## Atajos
 
@@ -57,7 +71,9 @@ la sección [Releases](../../releases).
 
 ## Estado
 
-En validación: lectura de control (ambos sticks + botones) y `ControlSend`
-sin robo de foco confirmados en pruebas locales; pendiente de confirmar el
-comportamiento contra un Target Manager real. Ver `SPRINTS.md` para el
-detalle de avance.
+Lectura de control (ambos sticks + botones) confirmada. Probado contra un
+Target Manager real (2026-08): "Use Host Controller" y "Keyboard Mapping"
+solo procesan input cuando la ventana tiene el foco real — el envío ahora
+activa cada ventana antes de mandar cada tecla. Pendiente confirmar en
+Target Manager real con esta versión. Ver `SPRINTS.md` para el detalle de
+avance.

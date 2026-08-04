@@ -29,6 +29,9 @@ PrevAxisState := Map("LX_pos", false, "LX_neg", false, "LY_pos", false, "LY_neg"
 ; en el control fisico de Xbox.
 ; NOTA: el stick derecho usa flechas (Up/Down/Left/Right) como equivalencia por
 ; defecto (uso comun para camara) - ajustar "output" si el TM usa otras teclas.
+; "Cross" confirmado contra TM real = "L". El resto (Circle/Square/Triangle/L1/
+; movimiento) siguen siendo valores por defecto sin confirmar - ajustar cuando
+; se verifiquen contra la configuracion real del TM.
 ActionMap := [
     {name: "MoveUp",    axis: "LY", dir: 1,  output: "w"},
     {name: "MoveDown",  axis: "LY", dir: -1, output: "s"},
@@ -38,7 +41,7 @@ ActionMap := [
     {name: "LookDown",  axis: "RY", dir: -1, output: "Down"},
     {name: "LookLeft",  axis: "RX", dir: -1, output: "Left"},
     {name: "LookRight", axis: "RX", dir: 1,  output: "Right"},
-    {name: "Cross",     button: XINPUT_GAMEPAD_A,             output: "Space"},
+    {name: "Cross",     button: XINPUT_GAMEPAD_A,             output: "L"},
     {name: "Circle",    button: XINPUT_GAMEPAD_B,             output: "LShift"},
     {name: "Square",    button: XINPUT_GAMEPAD_X,             output: "q"},
     {name: "Triangle",  button: XINPUT_GAMEPAD_Y,             output: "e"},
@@ -50,7 +53,8 @@ MainGui := Gui(, "PS5 Input Relay")
 MainGui.Add("Text", , "Marca la casilla de una ventana para enlazarla / desenlazarla:")
 
 LV := MainGui.Add("ListView", "r10 w500 Checked", ["Ventana", "Handle"])
-LV.ModifyCol(1, 350)
+LV.ModifyCol(1, 480)
+LV.ModifyCol(2, 0)  ; oculta el handle - el usuario no lo necesita, pero el codigo si lo sigue usando
 LV.OnEvent("ItemCheck", ToggleLink)
 
 BtnRefresh := MainGui.Add("Button", , "Actualizar lista")
@@ -327,19 +331,26 @@ EnviarATodasLasVentanas(outputKey, downOrUp) {
         try {
             if !WinExist("ahk_id " . hwnd)
                 continue
+            WinActivate("ahk_id " . hwnd)
+            if !WinWaitActive("ahk_id " . hwnd, , 0.3)
+                continue
             if (downOrUp = "down")
-                ControlSend("{" . outputKey . " down}", , "ahk_id " . hwnd)
+                Send("{" . outputKey . " down}")
             else
-                ControlSend("{" . outputKey . " up}", , "ahk_id " . hwnd)
+                Send("{" . outputKey . " up}")
         }
     }
 }
-; Manda la tecla equivalente a cada ventana enlazada (TargetWindows) usando
-; ControlSend, que entrega el mensaje directo a la ventana destino sin
-; activarla ni robar el foco/mouse del usuario.
+; Manda la tecla equivalente a cada ventana enlazada (TargetWindows), activando
+; cada una brevemente antes de enviar. Es necesario porque el Target Manager de
+; PS5 solo procesa input (control USB o teclado) cuando su ventana tiene el foco
+; real de Windows - confirmado en pruebas, no hay forma de evitarlo. Como el
+; input se "congela" en su ultimo estado al perder el foco, no hace falta
+; mantenerlo activo continuamente - basta con visitarlo en cada transicion
+; down/up para que el efecto se vea practicamente simultaneo entre consolas.
 
 ReproducirLoop(*) {
-    global Looping, RecordedEvents
+    global Looping, RecordedEvents, MainGui
     if (RecordedEvents.Length = 0) {
         MsgBox("No hay ninguna grabacion todavia. Usa Ctrl+R o el boton Grabar primero.")
         return
@@ -355,10 +366,12 @@ ReproducirLoop(*) {
             EnviarATodasLasVentanas(evt.key, evt.action)
         }
     }
+    try WinActivate("ahk_id " . MainGui.Hwnd)
 }
 ; Reproduce la secuencia grabada (RecordedEvents) en loop indefinido,
 ; respetando los tiempos originales entre teclas, hasta que Looping
-; se ponga en false (Ctrl+P o boton Stop Loop).
+; se ponga en false (Ctrl+P o boton Stop Loop). Al detenerse, devuelve el
+; foco al panel principal.
 
 EsperaInterrumpible(ms) {
     global Looping
