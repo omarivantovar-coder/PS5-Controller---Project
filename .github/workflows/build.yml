@@ -18,24 +18,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Descargar AutoHotkey v2 (portable)
+      - name: Descargar AutoHotkey v2 y Ahk2Exe (GitHub Releases, evita Cloudflare de autohotkey.com)
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://www.autohotkey.com/download/ahk-v2.zip" -OutFile "ahk.zip"
+          $headers = @{ "User-Agent" = "ps5-controller-ci" }
+
+          # Interprete v2 (portable) - usamos AutoHotkey64.exe como "base file" del compilado
+          $ahkRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases/latest" -Headers $headers
+          $ahkZipUrl = ($ahkRelease.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1).browser_download_url
+          Invoke-WebRequest -Uri $ahkZipUrl -OutFile "ahk.zip"
           Expand-Archive -Path "ahk.zip" -DestinationPath "ahk"
+
+          # Ahk2Exe (el compilador) es un repo/release separado del interprete
+          $compilerRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest" -Headers $headers
+          $compilerZipUrl = ($compilerRelease.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1).browser_download_url
+          Invoke-WebRequest -Uri $compilerZipUrl -OutFile "ahk2exe.zip"
+          Expand-Archive -Path "ahk2exe.zip" -DestinationPath "ahk2exe"
 
       - name: Compilar a .exe (standalone, 64-bit)
         shell: pwsh
         run: |
-          $ahk2exe = Get-ChildItem -Path "ahk" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1
+          $ahk2exe = Get-ChildItem -Path "ahk2exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1
           if (-not $ahk2exe) { throw "No se encontro Ahk2Exe.exe dentro del paquete descargado." }
 
-          $base = Get-ChildItem -Path "ahk" -Recurse -Filter "*.bin" |
-                  Where-Object { $_.Name -match "64" -and $_.Name -match "Unicode" } |
-                  Select-Object -First 1
-          if (-not $base) { throw "No se encontro el base file de 64-bit dentro del paquete descargado." }
+          $base = Get-ChildItem -Path "ahk" -Recurse -Filter "AutoHotkey64.exe" | Select-Object -First 1
+          if (-not $base) { throw "No se encontro AutoHotkey64.exe (base file) dentro del paquete descargado." }
 
-          & $ahk2exe.FullName /in "PS5-Controller.ahk" /out "PS5-Controller.exe" /base $base.FullName
+          Start-Process -FilePath $ahk2exe.FullName -ArgumentList "/in `"PS5-Controller.ahk`"", "/out `"PS5-Controller.exe`"", "/base `"$($base.FullName)`"" -Wait
           if (-not (Test-Path "PS5-Controller.exe")) { throw "La compilacion no genero PS5-Controller.exe" }
 
       - name: Subir como artifact de build

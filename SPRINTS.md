@@ -66,8 +66,17 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 ## Sprint 4 — Validación real y distribución
 **Estado:** 🔲 En curso
 
-- [ ] Confirmar que el workflow de Actions compila correctamente (revisar
-      pestaña Actions tras el primer push)
+- [x] Reporte de pruebas QA externo (2026-08-03) — ver `REPORTE_PRUEBAS_2026-08-03.md`
+- [x] Fix: bug de Map (int vs string) causaba que los checkboxes se vieran
+      desmarcados tras refrescar la lista, aunque la ventana seguia enlazada
+      (`ToggleLink` ahora normaliza el handle a `Integer`)
+- [x] Fix: workflow de Actions fallaba siempre — la URL de autohotkey.com
+      esta protegida por Cloudflare (bloquea IPs de datacenter) y el zip
+      portable no trae `Ahk2Exe.exe` de todos modos. Ahora descarga el
+      interprete y el compilador (repo separado `AutoHotkey/Ahk2Exe`) desde
+      GitHub Releases. Verificado localmente: compila y corre correctamente.
+- [ ] Confirmar que el workflow corregido compila bien en Actions (revisar
+      pestaña Actions tras este push)
 - [ ] Probar `ControlSend` contra un Target Manager real (no Friv)
 - [ ] Confirmar/ajustar las equivalencias de teclado configuradas en el TM
       contra las de `ActionMap` en el script (especialmente stick derecho)

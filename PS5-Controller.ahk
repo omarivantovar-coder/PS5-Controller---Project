@@ -398,7 +398,7 @@ ToggleLink(ctrl, row, checked) {
     if !row
         return
     title := LV.GetText(row, 1)
-    hwnd := LV.GetText(row, 2)
+    hwnd := Integer(LV.GetText(row, 2))
     if (checked)
         TargetWindows[hwnd] := title
     else
@@ -406,3 +406,8 @@ ToggleLink(ctrl, row, checked) {
 }
 ; Se ejecuta al marcar/desmarcar la casilla de una fila. Si se marco, agrega
 ; la ventana a TargetWindows; si se desmarco, la quita.
+; NOTA: LV.GetText() devuelve el handle como string; se convierte a Integer
+; explicitamente porque WinGetList() (usado en RefreshWindowList) devuelve
+; enteros, y Map.Has()/Delete() distinguen clave int de clave string aunque
+; representen el mismo numero - sin esta conversion, los checkboxes se veian
+; desmarcados tras refrescar la lista aunque la ventana seguia enlazada.
