@@ -48,17 +48,33 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 
 ---
 
-## Sprint 3 — Validación real y distribución
+## Sprint 3 — UI: checkboxes, vista avanzada y stick derecho
+**Estado:** ✅ Completado — 2026-08-03
+
+- [x] Enlazar/desenlazar ventanas por checkbox en vez de doble clic
+- [x] Lectura del stick derecho (XInput RX/RY) con equivalencia por defecto
+      a flechas (Up/Down/Left/Right)
+- [x] Indicador visual de botón/stick presionado (se oscurece al presionar)
+- [x] Ventana secundaria "Vista avanzada" para no agrandar el panel principal
+- [x] Indicador parpadeante en el botón Play Loop mientras corre
+- [x] Diagnóstico de lectura XInput (confirmado: hardware y lectura
+      funcionan correctamente; el stick derecho llega a valores extremos
+      sin problema)
+
+---
+
+## Sprint 4 — Validación real y distribución
 **Estado:** 🔲 En curso
 
 - [ ] Confirmar que el workflow de Actions compila correctamente (revisar
       pestaña Actions tras el primer push)
 - [ ] Probar `ControlSend` contra un Target Manager real (no Friv)
 - [ ] Confirmar/ajustar las equivalencias de teclado configuradas en el TM
-      contra las de `ActionMap` en el script
+      contra las de `ActionMap` en el script (especialmente stick derecho)
 - [ ] Ajustar deadzone/sensibilidad del stick según comportamiento real
 - [ ] Distribuir el `.exe` compilado a otros PCs de la empresa
 - [ ] Invitar colaboradores al repo (Settings → Collaborators)
+- [ ] Generar token/acceso para pruebas desde otro dispositivo
 
 ---
 

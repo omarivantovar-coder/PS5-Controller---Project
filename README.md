@@ -16,14 +16,19 @@ manual repetitivo.
 ## Cómo funciona
 
 1. **Grabar**: mientras "Grabar" está activo, el programa sondea tu control
-   físico de Xbox (botones + stick izquierdo) y guarda cada evento con su
-   tiempo real entre pulsaciones.
-2. **Enlazar ventanas**: doble clic sobre cualquier ventana abierta en la
+   físico de Xbox (botones + ambos sticks) y guarda cada evento con su
+   tiempo real entre pulsaciones. El stick derecho usa flechas como
+   equivalencia por defecto (uso común para cámara) — ajustable en
+   `ActionMap` si tu Target Manager usa otras teclas.
+2. **Enlazar ventanas**: marca la casilla de cualquier ventana abierta en la
    lista para enlazarla/desenlazarla como destino.
 3. **Relay en vivo / Loop**: el input (en vivo o grabado) se manda como
    teclas equivalentes a cada ventana enlazada usando `ControlSend`, que no
    activa la ventana ni te quita el foco — puedes seguir usando tu PC mientras
    corre.
+4. **Vista avanzada**: ventana aparte (botón "Ver vista avanzada") con el
+   detalle en vivo de cada botón/stick — se oscurece mientras está
+   presionado. Útil para depurar, no hace falta para el uso diario.
 
 ## Atajos
 
@@ -52,5 +57,7 @@ la sección [Releases](../../releases).
 
 ## Estado
 
-En validación: probado con ventanas de escritorio genéricas; pendiente de
-confirmar el comportamiento de `ControlSend` contra un Target Manager real.
+En validación: lectura de control (ambos sticks + botones) y `ControlSend`
+sin robo de foco confirmados en pruebas locales; pendiente de confirmar el
+comportamiento contra un Target Manager real. Ver `SPRINTS.md` para el
+detalle de avance.
