@@ -39,12 +39,14 @@ manual repetitivo.
    dentro del margen configurado.
 5. **Macros**: hasta 3 grabaciones con nombre, persistentes en
    `ps5_macros.ini` (sobreviven a cerrar el programa y reiniciar el PC).
-   Grabar siempre sobreescribe la macro activa — sin diálogos de "guardar
-   como". Selector y botón de renombrar debajo de los controles de
-   reproducción.
-6. **Vista avanzada**: ventana aparte (botón "Ver vista avanzada") con el
-   detalle en vivo de cada botón/stick — se oscurece mientras está
-   presionado. Útil para depurar, no hace falta para el uso diario.
+   **Grabar ya NO guarda solo** — deja la grabación lista en memoria para
+   "Play Loop" inmediato, pero hay que apretar **"💾 Guardar como macro"** a
+   propósito para que quede persistida en el slot activo. Elegir un slot en
+   el desplegable solo cambia a cuál se va a guardar/renombrar, sin tocar la
+   grabación actual — para cargar y reproducir un macro ya guardado se usa el
+   botón **"▶ Reproducir"** junto al selector (distinto de "Play Loop", que
+   reproduce lo último grabado/cargado). El panel de macros es desplegable
+   (flecha ▼/▶) para no ocupar espacio cuando no se necesita el detalle.
 
 ## Configuración necesaria en Target Manager
 

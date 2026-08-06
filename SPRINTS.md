@@ -137,6 +137,33 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 
 ---
 
+## Sprint 6 — Íconos, panel de macros desplegable y guardado explícito
+**Estado:** ✅ Completado — 2026-08-06
+
+- [x] Se quitó por completo la "Vista avanzada" (ventana secundaria, `RecIndicator`,
+      `AccionText`, indicadores por botón/stick) — el usuario no la consideró
+      necesaria. Limpiado `ProcesarEvento` y removidas todas las funciones
+      asociadas (`CrearIndicador`, `ToggleAdvancedView`, `CerrarVistaAvanzada`,
+      `ParpadeoRec`).
+- [x] Íconos simples (emoji) en los botones principales para que se entiendan
+      de un vistazo (📡 Relay, ⏺ Grabar, ▶ Play Loop, ⏹ Stop Loop, 🔄 Actualizar
+      lista, ✏ Renombrar).
+- [x] Panel de macros ahora es desplegable dentro del panel principal (flecha
+      ▼/▶, `ToggleMacroPanel`) en vez de ventana aparte — colapsado solo se ve
+      el selector y el estado "Reproducir: ON/OFF"; expandido se ve además el
+      nombre editable, renombrar y el contador de eventos.
+- [x] **Rediseño del flujo de guardado** (grabar ya no autoguarda): se separó
+      "grabación en memoria" de "macro guardado en disco". `ToggleRecording`
+      ya no llama a `GuardarSlot`; se agregó el botón explícito
+      **"💾 Guardar como macro"** (`GuardarComoMacro`). Elegir un slot en el
+      dropdown (`CambiarSlotActivo`) ya no carga ni sobreescribe la grabación
+      actual, solo cambia a dónde apunta Guardar/Renombrar. Se agregó el botón
+      **"▶ Reproducir"** (`ReproducirMacroGuardado`) para cargar y reproducir
+      un slot guardado explícitamente, distinto de "Play Loop" (que reproduce
+      lo último grabado o cargado).
+
+---
+
 ## Backlog / ideas sin sprint asignado
 
 - Configuración de `ActionMap` editable desde la UI (sin tocar el script)

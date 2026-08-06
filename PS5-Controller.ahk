@@ -87,22 +87,22 @@ LV.ModifyCol(1, 480)
 LV.ModifyCol(2, 0)  ; oculta el handle - el usuario no lo necesita, pero el codigo si lo sigue usando
 LV.OnEvent("ItemCheck", ToggleLink)
 
-BtnRefresh := MainGui.Add("Button", , "Actualizar lista")
+BtnRefresh := MainGui.Add("Button", , "🔄 Actualizar lista")
 BtnRefresh.OnEvent("Click", RefreshWindowList)
 
 ; ---------- CONTROLES DE REPRODUCCION ----------
 MainGui.Add("Text", "xm y+15", "Atajos: Ctrl+Espacio Relay | Ctrl+R Grabar | Ctrl+L Loop | Ctrl+P Detener loop")
 
-BtnRelay := MainGui.Add("Button", "xm y+10 w120", "Relay")
+BtnRelay := MainGui.Add("Button", "xm y+10 w120", "📡 Relay")
 BtnRelay.OnEvent("Click", ToggleRelay)
 
-BtnRecord := MainGui.Add("Button", "x+10 w120", "Grabar")
+BtnRecord := MainGui.Add("Button", "x+10 w120", "⏺ Grabar")
 BtnRecord.OnEvent("Click", ToggleRecording)
 
-BtnPlay := MainGui.Add("Button", "x+10 w120", "Play Loop")
+BtnPlay := MainGui.Add("Button", "x+10 w120", "▶ Play Loop")
 BtnPlay.OnEvent("Click", ReproducirLoop)
 
-BtnStop := MainGui.Add("Button", "x+10 w120", "Stop Loop")
+BtnStop := MainGui.Add("Button", "x+10 w120", "⏹ Stop Loop")
 BtnStop.OnEvent("Click", DetenerLoop)
 
 MainGui.Add("Text", "xm y+15", "Margen de seguridad del Loop (ms):")
@@ -111,71 +111,42 @@ EdMargen.OnEvent("Change", ActualizarMargen)
 
 MargenWarningText := MainGui.Add("Text", "xm y+5 w500 cRed", "")
 
-; ---------- SELECTOR DE MACRO (3 slots persistentes) ----------
-MainGui.Add("Text", "xm y+15", "Macro activa:")
-SlotDropdown := MainGui.Add("DropDownList", "x+5 yp-4 w150 Choose1", NombresDeSlots())
+; ---------- SELECTOR DE MACRO (desplegable, 3 slots persistentes) ----------
+; Fila siempre visible: flecha para desplegar, el slot elegido y si el Loop
+; esta corriendo. Fila de detalle (nombre editable + renombrar + cantidad de
+; eventos) solo se muestra si se despliega con la flecha.
+AlturaFilaColapsable := 34 ; cuanto se corren hacia arriba los controles de abajo al colapsar
+
+BtnToggleMacros := MainGui.Add("Button", "xm y+15 w30", "▼")
+BtnToggleMacros.OnEvent("Click", ToggleMacroPanel)
+
+MainGui.Add("Text", "x+8 yp+5", "Macro:")
+SlotDropdown := MainGui.Add("DropDownList", "x+5 yp-5 w150 Choose1", NombresDeSlots())
 SlotDropdown.OnEvent("Change", CambiarSlotActivo)
 
-EditSlotName := MainGui.Add("Edit", "x+10 yp w150", MacroSlots[1].name)
+BtnReproducirMacro := MainGui.Add("Button", "x+10 yp-5 w110", "▶ Reproducir")
+BtnReproducirMacro.OnEvent("Click", ReproducirMacroGuardado)
 
-BtnRenombrar := MainGui.Add("Button", "x+5 yp", "Renombrar")
+BtnGuardarMacro := MainGui.Add("Button", "x+5 yp w150", "💾 Guardar como macro")
+BtnGuardarMacro.OnEvent("Click", GuardarComoMacro)
+
+ReproducirEstadoText := MainGui.Add("Text", "x+15 yp+5 w150", "Reproducir: OFF")
+
+EditSlotName := MainGui.Add("Edit", "xm y+8 w150", MacroSlots[1].name)
+
+BtnRenombrar := MainGui.Add("Button", "x+5 yp", "✏ Renombrar")
 BtnRenombrar.OnEvent("Click", RenombrarSlotActivo)
 
-SlotInfoText := MainGui.Add("Text", "xm y+8 w500", "")
+SlotInfoText := MainGui.Add("Text", "x+10 yp+5 w250", "")
+
+MacroPanelExpandido := true
 
 ControllerStatusText := MainGui.Add("Text", "xm y+15 w500", "🎮 Control: buscando...")
-
-BtnAdvanced := MainGui.Add("Button", "xm y+10 w200", "Ver vista avanzada")
-BtnAdvanced.OnEvent("Click", ToggleAdvancedView)
-AdvancedVisible := false
-
-; ---------- VENTANA SECUNDARIA: VISTA AVANZADA ----------
-; Vive aparte para no agrandar el panel principal. Muestra el detalle en vivo
-; de cada boton/stick (mas oscuro = presionado) - util para depurar, no para
-; el uso diario.
-AdvancedGui := Gui(, "PS5 Input Relay - Vista avanzada")
-AdvancedGui.OnEvent("Close", CerrarVistaAvanzada)
-
-RecIndicator := AdvancedGui.Add("Text", "xm w500 cRed", "")
-RecIndicator.SetFont("s14 Bold")
-
-AccionText := AdvancedGui.Add("Text", "xm y+5 w500", "Ultima accion: -")
-
-AdvancedGui.Add("Text", "xm y+15", "Estado en vivo (mas oscuro = presionado):")
-BotonControls := Map()
-
-AdvancedGui.Add("Text", "xm y+8", "Stick izquierdo:")
-primero := true
-for accion in ActionMap {
-    if !accion.HasOwnProp("axis") || (accion.axis != "LX" && accion.axis != "LY")
-        continue
-    BotonControls[accion.name] := CrearIndicador(accion.name, primero)
-    primero := false
-}
-
-AdvancedGui.Add("Text", "xm y+8", "Stick derecho:")
-primero := true
-for accion in ActionMap {
-    if !accion.HasOwnProp("axis") || (accion.axis != "RX" && accion.axis != "RY")
-        continue
-    BotonControls[accion.name] := CrearIndicador(accion.name, primero)
-    primero := false
-}
-
-AdvancedGui.Add("Text", "xm y+8", "Botones:")
-primero := true
-for accion in ActionMap {
-    if !accion.HasOwnProp("button")
-        continue
-    BotonControls[accion.name] := CrearIndicador(accion.name, primero)
-    primero := false
-}
 
 MainGui.Show()
 RefreshWindowList()
 ActualizarSlotInfoText()
 SetTimer(PollController, 15)
-SetTimer(ParpadeoRec, 500)
 SetTimer(ParpadeoLoop, 400)
 
 ; ---------- HOTKEYS GLOBALES (funcionan en cualquier ventana) ----------
@@ -186,42 +157,10 @@ SetTimer(ParpadeoLoop, 400)
 
 ; ---------- FUNCIONES ----------
 
-CrearIndicador(texto, primero) {
-    global AdvancedGui
-    opts := primero ? "xm y+6 w70 h26 Center Border cGray" : "x+6 yp w70 h26 Center Border cGray"
-    return AdvancedGui.Add("Text", opts, texto)
-}
-; Crea una casilla de indicador para una accion del ActionMap, dentro de la
-; ventana de vista avanzada. "primero" controla si arranca una fila nueva
-; (xm) o continua la fila actual (x+6 yp).
-
-ToggleAdvancedView(*) {
-    global AdvancedGui, AdvancedVisible, BtnAdvanced
-    AdvancedVisible := !AdvancedVisible
-    if AdvancedVisible {
-        AdvancedGui.Show()
-        BtnAdvanced.Text := "Ocultar vista avanzada"
-    } else {
-        AdvancedGui.Hide()
-        BtnAdvanced.Text := "Ver vista avanzada"
-    }
-}
-; Muestra u oculta la ventana de vista avanzada y actualiza el texto del
-; boton para reflejar la accion disponible.
-
-CerrarVistaAvanzada(*) {
-    global AdvancedGui, AdvancedVisible, BtnAdvanced
-    AdvancedVisible := false
-    BtnAdvanced.Text := "Ver vista avanzada"
-    AdvancedGui.Hide()
-}
-; Se ejecuta al cerrar la ventana de vista avanzada con la X - la oculta en
-; vez de destruirla, para poder reabrirla sin recrear los controles.
-
 ToggleRelay(*) {
     global LiveRelay, BtnRelay
     LiveRelay := !LiveRelay
-    BtnRelay.Text := LiveRelay ? "Relay: ON" : "Relay"
+    BtnRelay.Text := LiveRelay ? "📡 Relay: ON" : "📡 Relay"
     ToolTip("Relay: " . (LiveRelay ? "ON" : "OFF"))
     SetTimer(() => ToolTip(), -800)
 }
@@ -230,31 +169,23 @@ ToggleRelay(*) {
 
 ToggleRecording(*) {
     global Recording, RecordedEvents, LastEventTime, BtnRecord
-    global MacroSlots, ActiveSlot, SlotDropdown, EditSlotName, BtnRenombrar
     Recording := !Recording
     if (Recording) {
         RecordedEvents := []
         LastEventTime := A_TickCount
-        BtnRecord.Text := "Grabando..."
-        SlotDropdown.Enabled := false
-        EditSlotName.Enabled := false
-        BtnRenombrar.Enabled := false
+        BtnRecord.Text := "⏺ Grabando..."
         ToolTip("Grabando: SI")
     } else {
-        BtnRecord.Text := "Grabar"
-        MacroSlots[ActiveSlot].events := RecordedEvents.Clone()
-        GuardarSlot(ActiveSlot, MacroSlots[ActiveSlot].name, RecordedEvents)
+        BtnRecord.Text := "⏺ Grabar"
         ActualizarSlotInfoText()
-        SlotDropdown.Enabled := true
-        EditSlotName.Enabled := true
-        BtnRenombrar.Enabled := true
-        ToolTip("Grabacion detenida: " . RecordedEvents.Length . " eventos guardados en " . MacroSlots[ActiveSlot].name)
+        ToolTip("Grabacion detenida: " . RecordedEvents.Length . " eventos. Usa 'Guardar como macro' para no perderla.")
     }
     SetTimer(() => ToolTip(), -1200)
 }
-; Al detener la grabacion, guarda automaticamente en el slot activo (sin
-; dialogo de "guardar como" - siempre sobreescribe el slot actualmente
-; seleccionado) y persiste a disco via GuardarSlot.
+; Al detener la grabacion, la deja lista en memoria (para "Play Loop"
+; inmediato) pero NO la guarda a disco sola - hay que usar el boton "Guardar
+; como macro" a proposito. Asi no cualquier grabacion de prueba pisa un slot
+; guardado sin querer.
 
 SerializarEventos(eventos) {
     texto := ""
@@ -313,21 +244,41 @@ NombresDeSlots() {
 ; Devuelve los 3 nombres de slot actuales, usado para poblar el dropdown.
 
 CambiarSlotActivo(ctrl, *) {
-    global ActiveSlot, MacroSlots, RecordedEvents, Recording, EditSlotName, SlotDropdown
-    if (Recording) {
-        SlotDropdown.Choose(ActiveSlot)
-        ToolTip("Detene la grabacion antes de cambiar de macro")
-        SetTimer(() => ToolTip(), -1200)
-        return
-    }
+    global ActiveSlot, MacroSlots, EditSlotName, SlotDropdown
     ActiveSlot := SlotDropdown.Value
-    RecordedEvents := MacroSlots[ActiveSlot].events.Clone()
     EditSlotName.Text := MacroSlots[ActiveSlot].name
     ActualizarSlotInfoText()
 }
-; Se ejecuta al elegir otro slot en el dropdown. Carga su grabacion como la
-; RecordedEvents activa. Bloqueado mientras se esta grabando, para no dejar
-; a medias una grabacion en curso.
+; Se ejecuta al elegir otro slot en el dropdown. Solo cambia cual es el slot
+; "activo" (a donde apunta Guardar/Renombrar) y refresca la info mostrada -
+; NO toca RecordedEvents, para no pisar una grabacion en curso solo por
+; mirar otro slot. Para cargar y reproducir ese slot, usar "Reproducir".
+
+ReproducirMacroGuardado(*) {
+    global RecordedEvents, MacroSlots, ActiveSlot
+    RecordedEvents := MacroSlots[ActiveSlot].events.Clone()
+    ActualizarSlotInfoText()
+    ReproducirLoop()
+}
+; Carga los eventos guardados del slot activo como la grabacion de trabajo y
+; arranca el Loop de inmediato - la via explicita para reproducir un macro
+; guardado, separada de "Play Loop" (que reproduce lo ultimo grabado/cargado).
+
+GuardarComoMacro(*) {
+    global RecordedEvents, MacroSlots, ActiveSlot
+    if (RecordedEvents.Length = 0) {
+        MsgBox("No hay ninguna grabacion todavia para guardar. Usa Grabar primero.")
+        return
+    }
+    MacroSlots[ActiveSlot].events := RecordedEvents.Clone()
+    GuardarSlot(ActiveSlot, MacroSlots[ActiveSlot].name, RecordedEvents)
+    ActualizarSlotInfoText()
+    ToolTip("Guardado en: " . MacroSlots[ActiveSlot].name)
+    SetTimer(() => ToolTip(), -1200)
+}
+; Guarda la grabacion actual (RecordedEvents) en el slot activo y persiste a
+; disco. Es el unico lugar donde una grabacion pasa de "en memoria" a
+; "guardada" - grabar solo (ToggleRecording) ya no guarda automaticamente.
 
 RenombrarSlotActivo(*) {
     global ActiveSlot, MacroSlots, EditSlotName, SlotDropdown
@@ -348,10 +299,36 @@ RenombrarSlotActivo(*) {
 
 ActualizarSlotInfoText() {
     global SlotInfoText, MacroSlots, ActiveSlot, RecordedEvents
-    SlotInfoText.Text := MacroSlots[ActiveSlot].name . ": " . RecordedEvents.Length . " eventos guardados"
+    guardados := MacroSlots[ActiveSlot].events.Length
+    texto := MacroSlots[ActiveSlot].name . ": " . guardados . " eventos guardados"
+    if (RecordedEvents.Length != guardados)
+        texto .= " (grabación actual sin guardar: " . RecordedEvents.Length . " eventos)"
+    SlotInfoText.Text := texto
 }
-; Refresca el texto informativo con el nombre del slot activo y cuantos
-; eventos tiene guardados actualmente.
+; Refresca el texto informativo: cuantos eventos tiene realmente guardados el
+; slot activo, y si la grabacion actual en memoria (RecordedEvents) difiere
+; de eso, lo aclara aparte - para que quede claro que grabar solo no guarda.
+
+ToggleMacroPanel(*) {
+    global MacroPanelExpandido, BtnToggleMacros, EditSlotName, BtnRenombrar, SlotInfoText
+    global ControllerStatusText, AlturaFilaColapsable
+
+    MacroPanelExpandido := !MacroPanelExpandido
+    EditSlotName.Visible := MacroPanelExpandido
+    BtnRenombrar.Visible := MacroPanelExpandido
+    SlotInfoText.Visible := MacroPanelExpandido
+    BtnToggleMacros.Text := MacroPanelExpandido ? "▼" : "▶"
+
+    desplazamiento := MacroPanelExpandido ? AlturaFilaColapsable : -AlturaFilaColapsable
+    ControllerStatusText.GetPos(&x, &y)
+    ControllerStatusText.Move(x, y + desplazamiento)
+}
+; Despliega/colapsa la fila de detalle del slot (nombre editable, renombrar,
+; cantidad de eventos). Colapsado solo queda visible la flecha, el dropdown
+; de slot y el indicador "Reproducir: ON/OFF". Como AHK no reacomoda
+; controles automaticamente al ocultar otros, esta funcion tambien corre
+; hacia arriba/abajo el estado del control (lo unico que queda debajo) para
+; no dejar un hueco vacio.
 
 DetenerLoop(*) {
     global Looping
@@ -362,33 +339,23 @@ DetenerLoop(*) {
 ; Corta el bucle del scheduler (ReproducirLoop revisa Looping en cada
 ; iteracion y sale limpiamente al verlo en false).
 
-ParpadeoRec(*) {
-    global Recording, RecIndicator
-    static visible := true
-    if (Recording) {
-        visible := !visible
-        RecIndicator.Text := visible ? "● REC" : ""
-    } else {
-        visible := true
-        RecIndicator.Text := ""
-    }
-}
-; Hace parpadear el indicador "● REC" cada 500ms mientras Recording este
-; activo, para que sea imposible no notar que se esta grabando.
-
 ParpadeoLoop(*) {
-    global Looping, BtnPlay
+    global Looping, BtnPlay, ReproducirEstadoText
     static visible := true
     if (Looping) {
         visible := !visible
         BtnPlay.Text := visible ? "🔴 Loop corriendo" : "⚫ Loop corriendo"
+        ReproducirEstadoText.Text := "Reproducir: ON"
     } else {
         visible := true
-        BtnPlay.Text := "Play Loop"
+        BtnPlay.Text := "▶ Play Loop"
+        ReproducirEstadoText.Text := "Reproducir: OFF"
     }
 }
 ; Hace parpadear el punto de color dentro del boton de Play Loop mientras
-; Looping este activo. Al detenerse, el boton vuelve a su texto normal.
+; Looping este activo, y mantiene sincronizado el indicador "Reproducir:
+; ON/OFF" de la fila colapsable de macros. Al detenerse, el boton vuelve a
+; su texto normal.
 
 PollController() {
     global ControllerIndex, PrevButtons, ControllerConnected, ControllerStatusText
@@ -458,7 +425,7 @@ ChequearEje(eje, valor) {
 ; transicion, igual que con los botones.
 
 ProcesarEvento(nombreAccion, downOrUp) {
-    global LiveRelay, ActionMap, Recording, RecordedEvents, LastEventTime, AccionText, BotonControls
+    global LiveRelay, ActionMap, Recording, RecordedEvents, LastEventTime
 
     accion := ""
     for a in ActionMap {
@@ -468,15 +435,10 @@ ProcesarEvento(nombreAccion, downOrUp) {
     if (accion = "")
         return
 
-    AccionText.Text := "Ultima accion: " . nombreAccion . " (" . downOrUp . ")"
-
     if (LiveRelay || Recording) {
         ToolTip(nombreAccion . " " . downOrUp)
         SetTimer(() => ToolTip(), -400)
     }
-
-    if BotonControls.Has(nombreAccion)
-        BotonControls[nombreAccion].SetFont(downOrUp = "down" ? "cBlack Bold" : "cGray Norm")
 
     if (LiveRelay)
         EnviarATodasLasVentanas(accion.output, downOrUp)
@@ -667,7 +629,7 @@ ActualizarMargen(ctrl, *) {
 ReproducirLoop(*) {
     global Looping, RecordedEvents, MainGui, TargetWindows
     global HeldKeys, WindowQueues, LastVisited, EventIndex, EventDueTick
-    global SlotDropdown, EditSlotName, BtnRenombrar
+    global SlotDropdown, EditSlotName, BtnRenombrar, BtnReproducirMacro, BtnGuardarMacro
 
     if (RecordedEvents.Length = 0) {
         MsgBox("No hay ninguna grabacion todavia. Usa Ctrl+R o el boton Grabar primero.")
@@ -692,6 +654,8 @@ ReproducirLoop(*) {
     SlotDropdown.Enabled := false
     EditSlotName.Enabled := false
     BtnRenombrar.Enabled := false
+    BtnReproducirMacro.Enabled := false
+    BtnGuardarMacro.Enabled := false
 
     Looping := true
     while (Looping)
@@ -700,6 +664,8 @@ ReproducirLoop(*) {
     SlotDropdown.Enabled := true
     EditSlotName.Enabled := true
     BtnRenombrar.Enabled := true
+    BtnReproducirMacro.Enabled := true
+    BtnGuardarMacro.Enabled := true
 
     try WinActivate("ahk_id " . MainGui.Hwnd)
 }
