@@ -26,12 +26,23 @@ manual repetitivo.
    procesa input (control USB o teclado) cuando su ventana tiene el foco real
    de Windows — no hay forma de evitar esto, es como está diseñado TM, no una
    limitación del script. Por eso el programa activa brevemente cada ventana
-   enlazada antes de mandarle cada tecla, y pasa a la siguiente. Como el
-   input se "congela" en su último estado al perder el foco, el efecto se ve
-   prácticamente simultáneo entre consolas aunque técnicamente se manden una
-   por una. **Mientras el Relay/Loop están activos, el PC queda ocupado
-   ciclando ventanas — no se puede usar para otra cosa en simultáneo.**
-4. **Vista avanzada**: ventana aparte (botón "Ver vista avanzada") con el
+   enlazada antes de mandarle cada tecla, y pasa a la siguiente. **Mientras el
+   Relay/Loop están activos, el PC queda ocupado ciclando ventanas — no se
+   puede usar para otra cosa en simultáneo.**
+4. **Keep-alive**: TM desconecta la consola si su ventana pasa ~3 segundos sin
+   recibir ningún evento nuevo, incluso con el input "congelado" sostenido. El
+   Loop no solo reproduce la grabación — también reenvía el estado actual a
+   cualquier ventana enlazada que lleve tiempo sin ser visitada, para que
+   ninguna se quede "muda" mientras el scheduler atiende a las demás. El
+   margen de seguridad es ajustable en el panel (campo junto a los botones),
+   con un aviso si la cantidad de ventanas enlazadas no alcanza a cubrirse
+   dentro del margen configurado.
+5. **Macros**: hasta 3 grabaciones con nombre, persistentes en
+   `ps5_macros.ini` (sobreviven a cerrar el programa y reiniciar el PC).
+   Grabar siempre sobreescribe la macro activa — sin diálogos de "guardar
+   como". Selector y botón de renombrar debajo de los controles de
+   reproducción.
+6. **Vista avanzada**: ventana aparte (botón "Ver vista avanzada") con el
    detalle en vivo de cada botón/stick — se oscurece mientras está
    presionado. Útil para depurar, no hace falta para el uso diario.
 

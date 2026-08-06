@@ -6,3 +6,6 @@ build/
 dist/
 ahk/
 ahk.zip
+
+# Macros grabadas por el usuario (data local, no codigo fuente)
+ps5_macros.ini

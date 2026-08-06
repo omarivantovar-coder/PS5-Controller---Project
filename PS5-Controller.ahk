@@ -8,6 +8,30 @@ RecordedEvents := []
 LastEventTime := 0
 Looping := false
 
+; ---------- SCHEDULER DEL LOOP (keep-alive contra Target Manager) ----------
+; TM desconecta la consola si una ventana enlazada pasa ~3s sin recibir NINGUN
+; evento nuevo, incluso si el input esta "congelado" en su ultimo estado. Con
+; hasta 8 ventanas enlazadas, visitarlas todas una vez por evento grabado no
+; alcanza para garantizar eso - hace falta un scheduler que ademas de entregar
+; los eventos reales, reenvie el estado actual a cualquier ventana que lleve
+; demasiado tiempo sin ser visitada. Ver LoopSchedulerTick.
+HeldKeys := Map()          ; que teclas de salida estan "abajo" ahora mismo segun la reproduccion
+WindowQueues := Map()      ; hwnd -> array de transiciones {key, action} pendientes de entregar
+LastVisited := Map()       ; hwnd -> A_TickCount de la ultima vez que se le mando algo
+EventIndex := 1            ; indice del proximo evento grabado a disparar
+EventDueTick := 0          ; A_TickCount en el que ese evento vence
+LoopSafetyMarginMs := 1500 ; margen ajustable, bien por debajo de los ~3000ms de riesgo
+WindowActivateTimeoutSec := 0.3
+EstimatedWindowVisitMs := 250 ; medido en pruebas locales con 2 ventanas reales (~985ms de ciclo / ~4 visitas)
+
+; ---------- PERSISTENCIA DE MACROS (3 slots con nombre) ----------
+MacrosFile := A_ScriptDir . "\ps5_macros.ini"
+MacroSlots := []
+Loop 3
+    MacroSlots.Push(CargarSlot(A_Index))
+ActiveSlot := 1
+RecordedEvents := MacroSlots[ActiveSlot].events.Clone()
+
 ; ---------- CONTROL FISICO (XINPUT) ----------
 ControllerIndex := 0
 ControllerConnected := ""  ; desconocido al inicio, se detecta en el primer poll
@@ -48,6 +72,12 @@ ActionMap := [
     {name: "L1",        button: XINPUT_GAMEPAD_LEFT_SHOULDER, output: "f"},
 ]
 
+TodosLosOutputs := []
+for accion in ActionMap
+    TodosLosOutputs.Push(accion.output)
+; Lista plana de todas las teclas de salida posibles, usada por
+; ReenviarEstadoCompleto para saber que soltar cuando no hay nada sostenido.
+
 ; ---------- INTERFAZ ----------
 MainGui := Gui(, "PS5 Input Relay")
 MainGui.Add("Text", , "Marca la casilla de una ventana para enlazarla / desenlazarla:")
@@ -60,6 +90,7 @@ LV.OnEvent("ItemCheck", ToggleLink)
 BtnRefresh := MainGui.Add("Button", , "Actualizar lista")
 BtnRefresh.OnEvent("Click", RefreshWindowList)
 
+; ---------- CONTROLES DE REPRODUCCION ----------
 MainGui.Add("Text", "xm y+15", "Atajos: Ctrl+Espacio Relay | Ctrl+R Grabar | Ctrl+L Loop | Ctrl+P Detener loop")
 
 BtnRelay := MainGui.Add("Button", "xm y+10 w120", "Relay")
@@ -73,6 +104,24 @@ BtnPlay.OnEvent("Click", ReproducirLoop)
 
 BtnStop := MainGui.Add("Button", "x+10 w120", "Stop Loop")
 BtnStop.OnEvent("Click", DetenerLoop)
+
+MainGui.Add("Text", "xm y+15", "Margen de seguridad del Loop (ms):")
+EdMargen := MainGui.Add("Edit", "x+5 yp-4 w70", String(LoopSafetyMarginMs))
+EdMargen.OnEvent("Change", ActualizarMargen)
+
+MargenWarningText := MainGui.Add("Text", "xm y+5 w500 cRed", "")
+
+; ---------- SELECTOR DE MACRO (3 slots persistentes) ----------
+MainGui.Add("Text", "xm y+15", "Macro activa:")
+SlotDropdown := MainGui.Add("DropDownList", "x+5 yp-4 w150 Choose1", NombresDeSlots())
+SlotDropdown.OnEvent("Change", CambiarSlotActivo)
+
+EditSlotName := MainGui.Add("Edit", "x+10 yp w150", MacroSlots[1].name)
+
+BtnRenombrar := MainGui.Add("Button", "x+5 yp", "Renombrar")
+BtnRenombrar.OnEvent("Click", RenombrarSlotActivo)
+
+SlotInfoText := MainGui.Add("Text", "xm y+8 w500", "")
 
 ControllerStatusText := MainGui.Add("Text", "xm y+15 w500", "🎮 Control: buscando...")
 
@@ -124,6 +173,7 @@ for accion in ActionMap {
 
 MainGui.Show()
 RefreshWindowList()
+ActualizarSlotInfoText()
 SetTimer(PollController, 15)
 SetTimer(ParpadeoRec, 500)
 SetTimer(ParpadeoLoop, 400)
@@ -156,6 +206,8 @@ ToggleAdvancedView(*) {
         BtnAdvanced.Text := "Ver vista avanzada"
     }
 }
+; Muestra u oculta la ventana de vista avanzada y actualiza el texto del
+; boton para reflejar la accion disponible.
 
 CerrarVistaAvanzada(*) {
     global AdvancedGui, AdvancedVisible, BtnAdvanced
@@ -173,21 +225,133 @@ ToggleRelay(*) {
     ToolTip("Relay: " . (LiveRelay ? "ON" : "OFF"))
     SetTimer(() => ToolTip(), -800)
 }
+; Prende/apaga el Relay en vivo (manda el input del control en tiempo real a
+; las ventanas enlazadas via EnviarATodasLasVentanas, sin robar el foco).
 
 ToggleRecording(*) {
     global Recording, RecordedEvents, LastEventTime, BtnRecord
+    global MacroSlots, ActiveSlot, SlotDropdown, EditSlotName, BtnRenombrar
     Recording := !Recording
     if (Recording) {
         RecordedEvents := []
         LastEventTime := A_TickCount
         BtnRecord.Text := "Grabando..."
+        SlotDropdown.Enabled := false
+        EditSlotName.Enabled := false
+        BtnRenombrar.Enabled := false
         ToolTip("Grabando: SI")
     } else {
         BtnRecord.Text := "Grabar"
-        ToolTip("Grabacion detenida: " . RecordedEvents.Length . " eventos guardados")
+        MacroSlots[ActiveSlot].events := RecordedEvents.Clone()
+        GuardarSlot(ActiveSlot, MacroSlots[ActiveSlot].name, RecordedEvents)
+        ActualizarSlotInfoText()
+        SlotDropdown.Enabled := true
+        EditSlotName.Enabled := true
+        BtnRenombrar.Enabled := true
+        ToolTip("Grabacion detenida: " . RecordedEvents.Length . " eventos guardados en " . MacroSlots[ActiveSlot].name)
     }
     SetTimer(() => ToolTip(), -1200)
 }
+; Al detener la grabacion, guarda automaticamente en el slot activo (sin
+; dialogo de "guardar como" - siempre sobreescribe el slot actualmente
+; seleccionado) y persiste a disco via GuardarSlot.
+
+SerializarEventos(eventos) {
+    texto := ""
+    for evt in eventos {
+        if (texto != "")
+            texto .= ";"
+        texto .= evt.key . "|" . evt.action . "|" . evt.delay
+    }
+    return texto
+}
+; Convierte el array de eventos grabados a un texto delimitado (";" entre
+; eventos, "|" entre campos) para poder guardarlo en una linea de INI.
+; Asume que ninguna tecla de salida del ActionMap contiene esos caracteres.
+
+ParsearEventos(texto) {
+    eventos := []
+    if (texto = "")
+        return eventos
+    for parte in StrSplit(texto, ";") {
+        campos := StrSplit(parte, "|")
+        if (campos.Length != 3)
+            continue
+        eventos.Push({key: campos[1], action: campos[2], delay: Integer(campos[3])})
+    }
+    return eventos
+}
+; Proceso inverso a SerializarEventos - reconstruye el array de eventos a
+; partir del texto guardado en el INI.
+
+GuardarSlot(n, nombre, eventos) {
+    global MacrosFile
+    seccion := "Slot" . n
+    IniWrite(nombre, MacrosFile, seccion, "Name")
+    IniWrite(SerializarEventos(eventos), MacrosFile, seccion, "Events")
+}
+; Escribe el nombre y los eventos de un slot en ps5_macros.ini.
+
+CargarSlot(n) {
+    global MacrosFile
+    seccion := "Slot" . n
+    nombre := IniRead(MacrosFile, seccion, "Name", "Slot " . n)
+    eventosTexto := IniRead(MacrosFile, seccion, "Events", "")
+    return {name: nombre, events: ParsearEventos(eventosTexto)}
+}
+; Lee un slot desde ps5_macros.ini. Si el archivo/seccion no existe todavia
+; (primera vez que corre el programa), IniRead devuelve los valores por
+; defecto ("Slot N", sin eventos) sin necesidad de chequear existencia.
+
+NombresDeSlots() {
+    global MacroSlots
+    nombres := []
+    for slot in MacroSlots
+        nombres.Push(slot.name)
+    return nombres
+}
+; Devuelve los 3 nombres de slot actuales, usado para poblar el dropdown.
+
+CambiarSlotActivo(ctrl, *) {
+    global ActiveSlot, MacroSlots, RecordedEvents, Recording, EditSlotName, SlotDropdown
+    if (Recording) {
+        SlotDropdown.Choose(ActiveSlot)
+        ToolTip("Detene la grabacion antes de cambiar de macro")
+        SetTimer(() => ToolTip(), -1200)
+        return
+    }
+    ActiveSlot := SlotDropdown.Value
+    RecordedEvents := MacroSlots[ActiveSlot].events.Clone()
+    EditSlotName.Text := MacroSlots[ActiveSlot].name
+    ActualizarSlotInfoText()
+}
+; Se ejecuta al elegir otro slot en el dropdown. Carga su grabacion como la
+; RecordedEvents activa. Bloqueado mientras se esta grabando, para no dejar
+; a medias una grabacion en curso.
+
+RenombrarSlotActivo(*) {
+    global ActiveSlot, MacroSlots, EditSlotName, SlotDropdown
+    nuevoNombre := Trim(EditSlotName.Text)
+    if (nuevoNombre = "")
+        nuevoNombre := "Slot " . ActiveSlot
+    MacroSlots[ActiveSlot].name := nuevoNombre
+    GuardarSlot(ActiveSlot, nuevoNombre, MacroSlots[ActiveSlot].events)
+    SlotDropdown.Delete()
+    SlotDropdown.Add(NombresDeSlots())
+    SlotDropdown.Choose(ActiveSlot)
+    ToolTip("Renombrado a: " . nuevoNombre)
+    SetTimer(() => ToolTip(), -1000)
+}
+; Renombra el slot activo (con un nombre por defecto si se deja vacio),
+; persiste el cambio a disco, y refresca el dropdown ya que un DropDownList
+; no permite renombrar un item existente in-place.
+
+ActualizarSlotInfoText() {
+    global SlotInfoText, MacroSlots, ActiveSlot, RecordedEvents
+    SlotInfoText.Text := MacroSlots[ActiveSlot].name . ": " . RecordedEvents.Length . " eventos guardados"
+}
+; Refresca el texto informativo con el nombre del slot activo y cuantos
+; eventos tiene guardados actualmente.
 
 DetenerLoop(*) {
     global Looping
@@ -195,6 +359,8 @@ DetenerLoop(*) {
     ToolTip("Loop detenido")
     SetTimer(() => ToolTip(), -800)
 }
+; Corta el bucle del scheduler (ReproducirLoop revisa Looping en cada
+; iteracion y sale limpiamente al verlo en false).
 
 ParpadeoRec(*) {
     global Recording, RecIndicator
@@ -331,47 +497,218 @@ EnviarATodasLasVentanas(outputKey, downOrUp) {
         try {
             if !WinExist("ahk_id " . hwnd)
                 continue
-            WinActivate("ahk_id " . hwnd)
-            if !WinWaitActive("ahk_id " . hwnd, , 0.3)
-                continue
             if (downOrUp = "down")
-                Send("{" . outputKey . " down}")
+                ControlSend("{" . outputKey . " down}", , "ahk_id " . hwnd)
             else
-                Send("{" . outputKey . " up}")
+                ControlSend("{" . outputKey . " up}", , "ahk_id " . hwnd)
         }
     }
 }
-; Manda la tecla equivalente a cada ventana enlazada (TargetWindows), activando
-; cada una brevemente antes de enviar. Es necesario porque el Target Manager de
-; PS5 solo procesa input (control USB o teclado) cuando su ventana tiene el foco
-; real de Windows - confirmado en pruebas, no hay forma de evitarlo. Como el
-; input se "congela" en su ultimo estado al perder el foco, no hace falta
-; mantenerlo activo continuamente - basta con visitarlo en cada transicion
-; down/up para que el efecto se vea practicamente simultaneo entre consolas.
+; Manda la tecla equivalente a cada ventana enlazada (TargetWindows) usando
+; ControlSend, sin activar ni robar el foco. Usado por el Relay en vivo -
+; funciona bien contra ventanas normales (navegador, apps de prueba), pero NO
+; contra el Target Manager de PS5, que ignora esto (ver el scheduler del Loop,
+; empezando en ActivarVentana/VisitarVentana mas abajo).
+
+ActivarVentana(hwnd) {
+    global WindowActivateTimeoutSec
+    if !WinExist("ahk_id " . hwnd)
+        return false
+    WinActivate("ahk_id " . hwnd)
+    return WinWaitActive("ahk_id " . hwnd, , WindowActivateTimeoutSec) ? true : false
+}
+; Activa una ventana y espera a que realmente tenga el foco (con timeout).
+; Devuelve false si la ventana ya no existe o no llego a activarse a tiempo,
+; para que quien la llame la reintente en el siguiente ciclo sin romperse.
+
+ReenviarEstadoCompleto(hwnd) {
+    global HeldKeys, TodosLosOutputs
+    if (HeldKeys.Count > 0) {
+        for outputKey, valor in HeldKeys
+            Send("{" . outputKey . " down}")
+    } else {
+        for outputKey in TodosLosOutputs
+            Send("{" . outputKey . " up}")
+    }
+}
+; Keep-alive: reenvia el estado actual a una ventana que no le debe ningun
+; evento real, para que TM no la vea "muda" por mucho tiempo. Si hay teclas
+; sostenidas, las vuelve a mandar "down" (igual al autorepeat de un teclado
+; real); si no hay nada sostenido, manda "up" de todas las teclas conocidas -
+; genera un evento real sin introducir una pulsacion fantasma.
+
+VisitarVentana(hwnd) {
+    global WindowQueues, LastVisited
+    if !ActivarVentana(hwnd)
+        return
+
+    if (WindowQueues.Has(hwnd) && WindowQueues[hwnd].Length > 0) {
+        evt := WindowQueues[hwnd].RemoveAt(1)
+        Send("{" . evt.key . " " . evt.action . "}")
+    } else {
+        ReenviarEstadoCompleto(hwnd)
+    }
+
+    LastVisited[hwnd] := A_TickCount
+}
+; Visita una ventana enlazada: si tiene una transicion real pendiente en su
+; cola, la entrega (en orden, aunque el momento exacto se desfase un poco por
+; el tiempo de activar la ventana); si no, hace un keep-alive.
+
+AvanzarRelojDeReproduccion() {
+    global RecordedEvents, EventIndex, EventDueTick, HeldKeys, WindowQueues, TargetWindows
+    while (A_TickCount >= EventDueTick) {
+        evt := RecordedEvents[EventIndex]
+
+        if (evt.action = "down")
+            HeldKeys[evt.key] := true
+        else
+            HeldKeys.Delete(evt.key)
+
+        for hwnd, title in TargetWindows {
+            if !WindowQueues.Has(hwnd)
+                WindowQueues[hwnd] := []
+            WindowQueues[hwnd].Push({key: evt.key, action: evt.action})
+        }
+
+        EventIndex += 1
+        if (EventIndex > RecordedEvents.Length)
+            EventIndex := 1
+        EventDueTick := A_TickCount + RecordedEvents[EventIndex].delay
+    }
+}
+; Avanza el reloj de reproduccion: mientras el proximo evento grabado ya este
+; vencido, lo aplica (actualiza HeldKeys y encola la transicion para todas las
+; ventanas enlazadas), y calcula cuando vence el siguiente. Usa "while" en vez
+; de "if" para no perder eventos simultaneos (delay 0). El reloj es relativo -
+; si el scheduler se atrasa sirviendo muchas ventanas, no intenta "ponerse al
+; dia" de golpe, solo acepta el desfase.
+
+ElegirVentanaAVisitar() {
+    global TargetWindows, WindowQueues, LastVisited, LoopSafetyMarginMs
+
+    masViejoConCola := ""
+    tickMasViejoConCola := 0
+    for hwnd, title in TargetWindows {
+        if (WindowQueues.Has(hwnd) && WindowQueues[hwnd].Length > 0) {
+            visitado := LastVisited.Has(hwnd) ? LastVisited[hwnd] : 0
+            if (masViejoConCola = "" || visitado < tickMasViejoConCola) {
+                tickMasViejoConCola := visitado
+                masViejoConCola := hwnd
+            }
+        }
+    }
+    if (masViejoConCola != "")
+        return masViejoConCola
+
+    masViejoKeepAlive := ""
+    tickMasViejoKeepAlive := 0
+    for hwnd, title in TargetWindows {
+        visitado := LastVisited.Has(hwnd) ? LastVisited[hwnd] : 0
+        if (masViejoKeepAlive = "" || visitado < tickMasViejoKeepAlive) {
+            tickMasViejoKeepAlive := visitado
+            masViejoKeepAlive := hwnd
+        }
+    }
+    if (masViejoKeepAlive != "" && (A_TickCount - tickMasViejoKeepAlive) >= (LoopSafetyMarginMs / 2))
+        return masViejoKeepAlive
+
+    return ""
+}
+; Decide que ventana visitar en este ciclo: prioriza cualquiera que le deba
+; una transicion real (la mas atrasada primero), y si ninguna debe nada,
+; revisa si alguna esta por vencer su margen de keep-alive (a la mitad del
+; margen configurado, con colchon extra antes del limite real). Devuelve ""
+; si no hace falta visitar nada todavia.
+
+LoopSchedulerTick() {
+    AvanzarRelojDeReproduccion()
+    hwnd := ElegirVentanaAVisitar()
+    if (hwnd = "") {
+        EsperaInterrumpible(20)
+        return
+    }
+    VisitarVentana(hwnd)
+}
+; Un paso del scheduler: avanza el reloj de reproduccion y visita la ventana
+; mas urgente (evento real pendiente, o keep-alive por vencer). Si nada
+; necesita atencion todavia, espera un poco en vez de girar en vacio.
+
+VerificarMargenSeguridad() {
+    global TargetWindows, LoopSafetyMarginMs, MargenWarningText, EstimatedWindowVisitMs
+    presupuestoEstimado := TargetWindows.Count * EstimatedWindowVisitMs
+    if (presupuestoEstimado > LoopSafetyMarginMs) {
+        MargenWarningText.Text := "⚠ " . TargetWindows.Count . " ventanas ≈ " . presupuestoEstimado
+            . "ms por ciclo completo, pero el margen es " . LoopSafetyMarginMs
+            . "ms - sube el margen o enlaza menos ventanas."
+    } else {
+        MargenWarningText.Text := ""
+    }
+}
+; Compara cuantas ventanas hay enlazadas contra el margen de seguridad
+; configurado (con un estimado de tiempo por visita, no medido) y muestra un
+; aviso no bloqueante si el margen podria quedar corto. Se llama al iniciar
+; el Loop y cada vez que se enlaza/desenlaza una ventana mientras corre.
+
+ActualizarMargen(ctrl, *) {
+    global LoopSafetyMarginMs
+    if !IsInteger(ctrl.Text)
+        return
+    valor := Integer(ctrl.Text)
+    if (valor < 300 || valor > 2900)
+        return
+    LoopSafetyMarginMs := valor
+    VerificarMargenSeguridad()
+}
+; Actualiza el margen de seguridad en vivo desde el campo de texto (valida
+; que sea un numero entero razonable, entre 300 y 2900ms). Aplica de
+; inmediato, incluso a mitad de un Loop corriendo.
 
 ReproducirLoop(*) {
-    global Looping, RecordedEvents, MainGui
+    global Looping, RecordedEvents, MainGui, TargetWindows
+    global HeldKeys, WindowQueues, LastVisited, EventIndex, EventDueTick
+    global SlotDropdown, EditSlotName, BtnRenombrar
+
     if (RecordedEvents.Length = 0) {
         MsgBox("No hay ninguna grabacion todavia. Usa Ctrl+R o el boton Grabar primero.")
         return
     }
-    Looping := true
-    while (Looping) {
-        for evt in RecordedEvents {
-            if (!Looping)
-                break
-            EsperaInterrumpible(evt.delay)
-            if (!Looping)
-                break
-            EnviarATodasLasVentanas(evt.key, evt.action)
-        }
+    if (TargetWindows.Count = 0) {
+        MsgBox("No hay ninguna ventana enlazada. Marca al menos una casilla de la lista.")
+        return
     }
+
+    HeldKeys := Map()
+    WindowQueues := Map()
+    LastVisited := Map()
+    for hwnd, title in TargetWindows {
+        WindowQueues[hwnd] := []
+        LastVisited[hwnd] := 0
+    }
+    EventIndex := 1
+    EventDueTick := A_TickCount + RecordedEvents[1].delay
+    VerificarMargenSeguridad()
+
+    SlotDropdown.Enabled := false
+    EditSlotName.Enabled := false
+    BtnRenombrar.Enabled := false
+
+    Looping := true
+    while (Looping)
+        LoopSchedulerTick()
+
+    SlotDropdown.Enabled := true
+    EditSlotName.Enabled := true
+    BtnRenombrar.Enabled := true
+
     try WinActivate("ahk_id " . MainGui.Hwnd)
 }
-; Reproduce la secuencia grabada (RecordedEvents) en loop indefinido,
-; respetando los tiempos originales entre teclas, hasta que Looping
-; se ponga en false (Ctrl+P o boton Stop Loop). Al detenerse, devuelve el
-; foco al panel principal.
+; Arranca el scheduler del Loop: valida que haya grabacion y al menos una
+; ventana enlazada, resetea el estado del scheduler (todas las ventanas
+; quedan "maximamente atrasadas" para forzar una primera visita de resync a
+; cada una antes de reproducir eventos reales), y corre LoopSchedulerTick en
+; bucle hasta que Looping se ponga en false (Ctrl+P o boton Stop Loop). Al
+; salir, reactiva el selector de macro y devuelve el foco al panel principal.
 
 EsperaInterrumpible(ms) {
     global Looping
@@ -408,17 +745,32 @@ RefreshWindowList(*) {
 ; las que sigan vigentes.
 
 ToggleLink(ctrl, row, checked) {
+    global TargetWindows, Looping, WindowQueues, LastVisited
     if !row
         return
     title := LV.GetText(row, 1)
     hwnd := Integer(LV.GetText(row, 2))
-    if (checked)
+    if (checked) {
         TargetWindows[hwnd] := title
-    else
+        if (Looping) {
+            WindowQueues[hwnd] := []
+            LastVisited[hwnd] := 0
+        }
+    } else {
         TargetWindows.Delete(hwnd)
+        if (Looping) {
+            WindowQueues.Delete(hwnd)
+            LastVisited.Delete(hwnd)
+        }
+    }
+    if (Looping)
+        VerificarMargenSeguridad()
 }
 ; Se ejecuta al marcar/desmarcar la casilla de una fila. Si se marco, agrega
-; la ventana a TargetWindows; si se desmarco, la quita.
+; la ventana a TargetWindows; si se desmarco, la quita. Si el Loop esta
+; corriendo, tambien siembra/limpia sus entradas en el scheduler (para que
+; una ventana enlazada a mitad de un Loop reciba su primera visita de
+; inmediato) y refresca el aviso de margen de seguridad.
 ; NOTA: LV.GetText() devuelve el handle como string; se convierte a Integer
 ; explicitamente porque WinGetList() (usado en RefreshWindowList) devuelve
 ; enteros, y Map.Has()/Delete() distinguen clave int de clave string aunque

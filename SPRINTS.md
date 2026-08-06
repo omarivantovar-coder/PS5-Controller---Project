@@ -102,8 +102,42 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 
 ---
 
+## Sprint 5 — Scheduler con keep-alive (hasta 8 consolas) + 3 macros persistentes
+**Estado:** ✅ Completado — 2026-08-05
+
+- [x] **Hallazgo crítico confirmado con el usuario**: aunque el input quede
+      "congelado" en TM al perder el foco, si una ventana pasa ~3s sin recibir
+      NINGÚN evento nuevo (ni siquiera un reenvío del mismo estado), la
+      consola arriesga desconectarse. El diseño anterior (un evento → visitar
+      cada ventana) no alcanzaba a garantizar esto con grabaciones de huecos
+      largos ni con varias consolas enlazadas.
+- [x] Nuevo scheduler de Loop (`LoopSchedulerTick` + `AvanzarRelojDeReproduccion`
+      + `ElegirVentanaAVisitar` + `VisitarVentana` + `ReenviarEstadoCompleto`):
+      entrega los eventos reales grabados en orden (una cola por ventana, para
+      no perder taps rápidos) y además hace keep-alive a cualquier ventana que
+      lleve más de la mitad del margen configurado sin ser visitada. Soporta
+      cualquier cantidad de ventanas enlazadas (probado hasta el punto que
+      importa: sin límite duro de 8, el margen ajustable avisa si no alcanza).
+      Probado con 2 ventanas reales (Notepad) durante 8s con una tecla
+      sostenida 5s: keep-alive cada ~985ms por ventana, muy por debajo del
+      margen de 1500ms, sin perder ningún evento.
+- [x] Margen de seguridad ajustable en la UI (`EdMargen`, default 1500ms,
+      aplica en vivo) + aviso no bloqueante si la cantidad de ventanas
+      enlazadas supera lo que el margen puede sostener (`VerificarMargenSeguridad`,
+      estimado de ~250ms por ventana calibrado con la prueba real).
+- [x] 3 slots de macro con nombre, persistentes en `ps5_macros.ini` (formato
+      delimitado simple, sin dependencias externas). Grabar siempre sobreescribe
+      el slot activo, sin diálogos. Selector + campo de renombrar en el panel
+      principal. Probado round-trip (guardar/cargar/cerrar/reabrir) de forma
+      aislada, confirmado correcto.
+- [x] Reordenamiento de UI: controles de reproducción arriba, selector de
+      macro debajo (a pedido del usuario).
+- [x] Documentación función por función en todo el archivo (pedido explícito
+      del usuario para facilitar debugging futuro).
+
+---
+
 ## Backlog / ideas sin sprint asignado
 
 - Configuración de `ActionMap` editable desde la UI (sin tocar el script)
-- Guardar/cargar múltiples grabaciones (no solo la última)
 - Selección de índice de control si hay más de uno conectado
