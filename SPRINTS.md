@@ -161,6 +161,11 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
       **"▶ Reproducir"** (`ReproducirMacroGuardado`) para cargar y reproducir
       un slot guardado explícitamente, distinto de "Play Loop" (que reproduce
       lo último grabado o cargado).
+- [x] Línea divisoria simple (estilo `SS_ETCHEDHORZ`) separando la sección de
+      macros de los controles de reproducción de arriba.
+- [x] "💾 Guardar como macro" se movió de la fila siempre visible a la fila
+      colapsable, junto a "Renombrar" — la fila visible por defecto quedó más
+      liviana (flecha, dropdown, Reproducir, estado de reproducción).
 
 ---
 

@@ -112,12 +112,16 @@ EdMargen.OnEvent("Change", ActualizarMargen)
 MargenWarningText := MainGui.Add("Text", "xm y+5 w500 cRed", "")
 
 ; ---------- SELECTOR DE MACRO (desplegable, 3 slots persistentes) ----------
-; Fila siempre visible: flecha para desplegar, el slot elegido y si el Loop
-; esta corriendo. Fila de detalle (nombre editable + renombrar + cantidad de
-; eventos) solo se muestra si se despliega con la flecha.
+; Linea divisoria simple (estilo 0x10 = SS_ETCHEDHORZ) para separar
+; visualmente esta seccion de los controles de reproduccion de arriba.
+MainGui.Add("Text", "xm y+15 w500 h2 0x10")
+
+; Fila siempre visible: flecha para desplegar, el slot elegido, reproducir
+; ese slot, y si el Loop esta corriendo. Fila de detalle (nombre editable +
+; renombrar + guardar + cantidad de eventos) solo se muestra al desplegar.
 AlturaFilaColapsable := 34 ; cuanto se corren hacia arriba los controles de abajo al colapsar
 
-BtnToggleMacros := MainGui.Add("Button", "xm y+15 w30", "▼")
+BtnToggleMacros := MainGui.Add("Button", "xm y+10 w30", "▼")
 BtnToggleMacros.OnEvent("Click", ToggleMacroPanel)
 
 MainGui.Add("Text", "x+8 yp+5", "Macro:")
@@ -127,15 +131,15 @@ SlotDropdown.OnEvent("Change", CambiarSlotActivo)
 BtnReproducirMacro := MainGui.Add("Button", "x+10 yp-5 w110", "▶ Reproducir")
 BtnReproducirMacro.OnEvent("Click", ReproducirMacroGuardado)
 
-BtnGuardarMacro := MainGui.Add("Button", "x+5 yp w150", "💾 Guardar como macro")
-BtnGuardarMacro.OnEvent("Click", GuardarComoMacro)
-
 ReproducirEstadoText := MainGui.Add("Text", "x+15 yp+5 w150", "Reproducir: OFF")
 
 EditSlotName := MainGui.Add("Edit", "xm y+8 w150", MacroSlots[1].name)
 
 BtnRenombrar := MainGui.Add("Button", "x+5 yp", "✏ Renombrar")
 BtnRenombrar.OnEvent("Click", RenombrarSlotActivo)
+
+BtnGuardarMacro := MainGui.Add("Button", "x+5 yp w150", "💾 Guardar como macro")
+BtnGuardarMacro.OnEvent("Click", GuardarComoMacro)
 
 SlotInfoText := MainGui.Add("Text", "x+10 yp+5 w250", "")
 
@@ -310,12 +314,13 @@ ActualizarSlotInfoText() {
 ; de eso, lo aclara aparte - para que quede claro que grabar solo no guarda.
 
 ToggleMacroPanel(*) {
-    global MacroPanelExpandido, BtnToggleMacros, EditSlotName, BtnRenombrar, SlotInfoText
+    global MacroPanelExpandido, BtnToggleMacros, EditSlotName, BtnRenombrar, BtnGuardarMacro, SlotInfoText
     global ControllerStatusText, AlturaFilaColapsable
 
     MacroPanelExpandido := !MacroPanelExpandido
     EditSlotName.Visible := MacroPanelExpandido
     BtnRenombrar.Visible := MacroPanelExpandido
+    BtnGuardarMacro.Visible := MacroPanelExpandido
     SlotInfoText.Visible := MacroPanelExpandido
     BtnToggleMacros.Text := MacroPanelExpandido ? "▼" : "▶"
 
@@ -324,11 +329,11 @@ ToggleMacroPanel(*) {
     ControllerStatusText.Move(x, y + desplazamiento)
 }
 ; Despliega/colapsa la fila de detalle del slot (nombre editable, renombrar,
-; cantidad de eventos). Colapsado solo queda visible la flecha, el dropdown
-; de slot y el indicador "Reproducir: ON/OFF". Como AHK no reacomoda
-; controles automaticamente al ocultar otros, esta funcion tambien corre
-; hacia arriba/abajo el estado del control (lo unico que queda debajo) para
-; no dejar un hueco vacio.
+; guardar como macro, cantidad de eventos). Colapsado solo queda visible la
+; flecha, el dropdown de slot, "Reproducir" y el indicador "Reproducir:
+; ON/OFF". Como AHK no reacomoda controles automaticamente al ocultar otros,
+; esta funcion tambien corre hacia arriba/abajo el estado del control (lo
+; unico que queda debajo) para no dejar un hueco vacio.
 
 DetenerLoop(*) {
     global Looping
