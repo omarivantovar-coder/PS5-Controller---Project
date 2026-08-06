@@ -109,6 +109,8 @@ MainGui.Add("Text", "xm y+15", "Margen de seguridad del Loop (ms):")
 EdMargen := MainGui.Add("Edit", "x+5 yp-4 w70", String(LoopSafetyMarginMs))
 EdMargen.OnEvent("Change", ActualizarMargen)
 
+ControllerStatusText := MainGui.Add("Text", "xm y+10 w500", "🎮 Control: buscando...")
+
 MargenWarningText := MainGui.Add("Text", "xm y+5 w500 cRed", "")
 
 ; ---------- SELECTOR DE MACRO (desplegable, 3 slots persistentes) ----------
@@ -119,33 +121,34 @@ MainGui.Add("Text", "xm y+15 w500 h2 0x10")
 ; Fila siempre visible: flecha para desplegar, el slot elegido, reproducir
 ; ese slot, y si el Loop esta corriendo. Fila de detalle (nombre editable +
 ; renombrar + guardar + cantidad de eventos) solo se muestra al desplegar.
-AlturaFilaColapsable := 34 ; cuanto se corren hacia arriba los controles de abajo al colapsar
-
+; Las posiciones de esta fila se calculan explicitamente desde la posicion
+; real de BtnToggleMacros (en vez de encadenar offsets yp+/-N entre controles
+; de distinta altura) para que no se amontonen entre si.
 BtnToggleMacros := MainGui.Add("Button", "xm y+10 w30", "▼")
 BtnToggleMacros.OnEvent("Click", ToggleMacroPanel)
+BtnToggleMacros.GetPos(&filaMacroX, &filaMacroY, &filaMacroW, &filaMacroH)
 
-MainGui.Add("Text", "x+8 yp+5", "Macro:")
-SlotDropdown := MainGui.Add("DropDownList", "x+5 yp-5 w150 Choose1", NombresDeSlots())
+MainGui.Add("Text", "x" . (filaMacroX + filaMacroW + 8) . " y" . (filaMacroY + 6), "Macro:")
+SlotDropdown := MainGui.Add("DropDownList", "x+5 y" . filaMacroY . " w150 Choose1", NombresDeSlots())
 SlotDropdown.OnEvent("Change", CambiarSlotActivo)
 
-BtnReproducirMacro := MainGui.Add("Button", "x+10 yp-5 w110", "▶ Reproducir")
+BtnReproducirMacro := MainGui.Add("Button", "x+10 y" . filaMacroY . " w110", "▶ Reproducir")
 BtnReproducirMacro.OnEvent("Click", ReproducirMacroGuardado)
 
-ReproducirEstadoText := MainGui.Add("Text", "x+15 yp+5 w150", "Reproducir: OFF")
+ReproducirEstadoText := MainGui.Add("Text", "x+15 y" . (filaMacroY + 6) . " w150", "Reproducir: OFF")
 
-EditSlotName := MainGui.Add("Edit", "xm y+8 w150", MacroSlots[1].name)
+filaColapsableY := filaMacroY + filaMacroH + 10
+EditSlotName := MainGui.Add("Edit", "xm y" . filaColapsableY . " w150", MacroSlots[1].name)
 
-BtnRenombrar := MainGui.Add("Button", "x+5 yp", "✏ Renombrar")
+BtnRenombrar := MainGui.Add("Button", "x+5 y" . filaColapsableY . " w110", "✏ Renombrar")
 BtnRenombrar.OnEvent("Click", RenombrarSlotActivo)
 
-BtnGuardarMacro := MainGui.Add("Button", "x+5 yp w150", "💾 Guardar como macro")
+BtnGuardarMacro := MainGui.Add("Button", "x+5 y" . filaColapsableY . " w150", "💾 Guardar como macro")
 BtnGuardarMacro.OnEvent("Click", GuardarComoMacro)
 
-SlotInfoText := MainGui.Add("Text", "x+10 yp+5 w250", "")
+SlotInfoText := MainGui.Add("Text", "x+10 y" . (filaColapsableY + 6) . " w250", "")
 
 MacroPanelExpandido := true
-
-ControllerStatusText := MainGui.Add("Text", "xm y+15 w500", "🎮 Control: buscando...")
 
 MainGui.Show()
 RefreshWindowList()
@@ -315,7 +318,6 @@ ActualizarSlotInfoText() {
 
 ToggleMacroPanel(*) {
     global MacroPanelExpandido, BtnToggleMacros, EditSlotName, BtnRenombrar, BtnGuardarMacro, SlotInfoText
-    global ControllerStatusText, AlturaFilaColapsable
 
     MacroPanelExpandido := !MacroPanelExpandido
     EditSlotName.Visible := MacroPanelExpandido
@@ -323,17 +325,13 @@ ToggleMacroPanel(*) {
     BtnGuardarMacro.Visible := MacroPanelExpandido
     SlotInfoText.Visible := MacroPanelExpandido
     BtnToggleMacros.Text := MacroPanelExpandido ? "▼" : "▶"
-
-    desplazamiento := MacroPanelExpandido ? AlturaFilaColapsable : -AlturaFilaColapsable
-    ControllerStatusText.GetPos(&x, &y)
-    ControllerStatusText.Move(x, y + desplazamiento)
 }
 ; Despliega/colapsa la fila de detalle del slot (nombre editable, renombrar,
 ; guardar como macro, cantidad de eventos). Colapsado solo queda visible la
 ; flecha, el dropdown de slot, "Reproducir" y el indicador "Reproducir:
-; ON/OFF". Como AHK no reacomoda controles automaticamente al ocultar otros,
-; esta funcion tambien corre hacia arriba/abajo el estado del control (lo
-; unico que queda debajo) para no dejar un hueco vacio.
+; ON/OFF". Es la ultima fila del panel, asi que no hay nada debajo que
+; reacomodar al ocultar/mostrar - solo deja un espacio en blanco cuando esta
+; colapsado.
 
 DetenerLoop(*) {
     global Looping
@@ -370,7 +368,13 @@ PollController() {
     conectadoAhora := (result = 0)
     if (conectadoAhora != ControllerConnected) {
         ControllerConnected := conectadoAhora
-        ControllerStatusText.Text := conectadoAhora ? "🎮 Control: Conectado" : "🎮 Control: No detectado"
+        if (conectadoAhora) {
+            ControllerStatusText.Text := "🎮 Control: Conectado"
+            ControllerStatusText.SetFont("cGreen")
+        } else {
+            ControllerStatusText.Text := "🎮 Control: No detectado"
+            ControllerStatusText.SetFont("cRed")
+        }
     }
     if !conectadoAhora
         return

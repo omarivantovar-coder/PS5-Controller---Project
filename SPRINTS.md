@@ -166,6 +166,15 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 - [x] "💾 Guardar como macro" se movió de la fila siempre visible a la fila
       colapsable, junto a "Renombrar" — la fila visible por defecto quedó más
       liviana (flecha, dropdown, Reproducir, estado de reproducción).
+- [x] Fix: la fila desplegable de macros se veía amontonada al expandir —
+      las posiciones se calculaban encadenando offsets `yp+/-N` entre
+      controles de distinta altura (botón vs texto vs dropdown), lo cual es
+      frágil. Reescrito para calcular la posición de cada fila explícitamente
+      a partir de la posición/alto real de `BtnToggleMacros` (`GetPos`), no
+      por acumulación de offsets relativos.
+- [x] Indicador de control (🎮 Conectado/No detectado) movido justo debajo
+      de "Margen de seguridad del Loop", y ahora se colorea en vivo: verde
+      si está conectado, rojo si no.
 
 ---
 
