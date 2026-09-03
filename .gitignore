@@ -9,3 +9,6 @@ ahk.zip
 
 # Macros grabadas por el usuario (data local, no codigo fuente)
 ps5_macros.ini
+
+# Log de diagnostico local (fallos de activacion de ventana)
+activar_ventana_debug.log

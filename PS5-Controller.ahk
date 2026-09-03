@@ -36,26 +36,40 @@ RecordedEvents := MacroSlots[ActiveSlot].events.Clone()
 ControllerIndex := 0
 ControllerConnected := ""  ; desconocido al inicio, se detecta en el primer poll
 
-XINPUT_GAMEPAD_A             := 0x1000
-XINPUT_GAMEPAD_B             := 0x2000
-XINPUT_GAMEPAD_X             := 0x4000
-XINPUT_GAMEPAD_Y             := 0x8000
-XINPUT_GAMEPAD_LEFT_SHOULDER := 0x0100
-XINPUT_STICK_DEADZONE        := 8000
+XINPUT_GAMEPAD_DPAD_UP        := 0x0001
+XINPUT_GAMEPAD_DPAD_DOWN      := 0x0002
+XINPUT_GAMEPAD_DPAD_LEFT      := 0x0004
+XINPUT_GAMEPAD_DPAD_RIGHT     := 0x0008
+XINPUT_GAMEPAD_START          := 0x0010
+XINPUT_GAMEPAD_BACK           := 0x0020
+XINPUT_GAMEPAD_LEFT_THUMB     := 0x0040
+XINPUT_GAMEPAD_RIGHT_THUMB    := 0x0080
+XINPUT_GAMEPAD_LEFT_SHOULDER  := 0x0100
+XINPUT_GAMEPAD_RIGHT_SHOULDER := 0x0200
+XINPUT_GAMEPAD_A              := 0x1000
+XINPUT_GAMEPAD_B              := 0x2000
+XINPUT_GAMEPAD_X              := 0x4000
+XINPUT_GAMEPAD_Y              := 0x8000
+XINPUT_STICK_DEADZONE         := 8000
+XINPUT_TRIGGER_THRESHOLD      := 30 ; valor oficial de XInput (rango del gatillo es 0-255)
 
 PrevButtons := 0
 PrevAxisState := Map("LX_pos", false, "LX_neg", false, "LY_pos", false, "LY_neg", false,
                       "RX_pos", false, "RX_neg", false, "RY_pos", false, "RY_neg", false)
+PrevTriggerState := Map("L", false, "R", false)
 
 ; ---------- MAPA DE ACCIONES ----------
 ; "output" es la tecla que se envia a los Target Managers enlazados (equivalencia
-; de teclado que ya usan). "button"/"axis" describen de donde viene el input real
-; en el control fisico de Xbox.
+; de teclado que ya usan). "button"/"axis"/"trigger" describen de donde viene el
+; input real en el control fisico de Xbox: "button" es un bit del bitmask de
+; wButtons, "axis" es un stick (LX/LY/RX/RY, digitalizado con deadzone), y
+; "trigger" es un gatillo analogico (L/R, digitalizado con XINPUT_TRIGGER_THRESHOLD).
 ; NOTA: el stick derecho usa flechas (Up/Down/Left/Right) como equivalencia por
 ; defecto (uso comun para camara) - ajustar "output" si el TM usa otras teclas.
-; "Cross" confirmado contra TM real = "L". El resto (Circle/Square/Triangle/L1/
-; movimiento) siguen siendo valores por defecto sin confirmar - ajustar cuando
-; se verifiquen contra la configuracion real del TM.
+; "Cross" confirmado contra TM real = "L". TODO el resto (incluyendo todo lo
+; agregado para completar el mapa: R1/L2/R2/L3/R3/D-Pad/Options/Share) sigue
+; siendo valores por defecto SIN CONFIRMAR - ajustar cuando se verifiquen
+; contra la configuracion real del TM.
 ActionMap := [
     {name: "MoveUp",    axis: "LY", dir: 1,  output: "w"},
     {name: "MoveDown",  axis: "LY", dir: -1, output: "s"},
@@ -69,7 +83,18 @@ ActionMap := [
     {name: "Circle",    button: XINPUT_GAMEPAD_B,             output: "LShift"},
     {name: "Square",    button: XINPUT_GAMEPAD_X,             output: "q"},
     {name: "Triangle",  button: XINPUT_GAMEPAD_Y,             output: "e"},
-    {name: "L1",        button: XINPUT_GAMEPAD_LEFT_SHOULDER, output: "f"},
+    {name: "L1",        button: XINPUT_GAMEPAD_LEFT_SHOULDER,  output: "f"},
+    {name: "R1",        button: XINPUT_GAMEPAD_RIGHT_SHOULDER, output: "r"},
+    {name: "L3",        button: XINPUT_GAMEPAD_LEFT_THUMB,     output: "z"},
+    {name: "R3",        button: XINPUT_GAMEPAD_RIGHT_THUMB,    output: "x"},
+    {name: "Options",   button: XINPUT_GAMEPAD_START,          output: "Enter"},
+    {name: "Share",     button: XINPUT_GAMEPAD_BACK,           output: "Backspace"},
+    {name: "DPadUp",    button: XINPUT_GAMEPAD_DPAD_UP,        output: "i"},
+    {name: "DPadDown",  button: XINPUT_GAMEPAD_DPAD_DOWN,      output: "k"},
+    {name: "DPadLeft",  button: XINPUT_GAMEPAD_DPAD_LEFT,      output: "j"},
+    {name: "DPadRight", button: XINPUT_GAMEPAD_DPAD_RIGHT,     output: "l"},
+    {name: "L2",        trigger: "L", output: "1"},
+    {name: "R2",        trigger: "R", output: "2"},
 ]
 
 TodosLosOutputs := []
@@ -380,6 +405,8 @@ PollController() {
         return
 
     wButtons := NumGet(buf, 4, "UShort")
+    bLeftTrigger := NumGet(buf, 6, "UChar")
+    bRightTrigger := NumGet(buf, 7, "UChar")
     sThumbLX := NumGet(buf, 8, "Short")
     sThumbLY := NumGet(buf, 10, "Short")
     sThumbRX := NumGet(buf, 12, "Short")
@@ -401,10 +428,13 @@ PollController() {
     ChequearEje("LY", sThumbLY)
     ChequearEje("RX", sThumbRX)
     ChequearEje("RY", sThumbRY)
+
+    ChequearTrigger("L", bLeftTrigger)
+    ChequearTrigger("R", bRightTrigger)
 }
 ; Sondea el control fisico (XInput) cada 15ms. Compara el estado actual contra
-; el anterior para detectar transiciones down/up de botones y direcciones de
-; stick, y las despacha a ProcesarEvento. Tambien mantiene el indicador de
+; el anterior para detectar transiciones down/up de botones, sticks y gatillos,
+; y las despacha a ProcesarEvento. Tambien mantiene el indicador de
 ; conexion del control en la UI.
 
 ChequearEje(eje, valor) {
@@ -432,6 +462,25 @@ ChequearEje(eje, valor) {
 ; Convierte el valor analogico de un eje del stick en dos direcciones digitales
 ; (positiva/negativa) usando una zona muerta, y dispara ProcesarEvento en cada
 ; transicion, igual que con los botones.
+
+ChequearTrigger(lado, valor) {
+    global ActionMap, PrevTriggerState, XINPUT_TRIGGER_THRESHOLD
+
+    activoAhora := (valor > XINPUT_TRIGGER_THRESHOLD)
+    activoAntes := PrevTriggerState[lado]
+    if (activoAhora = activoAntes)
+        return
+
+    for accion in ActionMap {
+        if !accion.HasOwnProp("trigger") || accion.trigger != lado
+            continue
+        ProcesarEvento(accion.name, activoAhora ? "down" : "up")
+    }
+    PrevTriggerState[lado] := activoAhora
+}
+; Igual que ChequearEje pero para un gatillo analogico (L2/R2), que solo tiene
+; una direccion (0-255) en vez de dos como un stick - se digitaliza con
+; XINPUT_TRIGGER_THRESHOLD y dispara ProcesarEvento en cada transicion.
 
 ProcesarEvento(nombreAccion, downOrUp) {
     global LiveRelay, ActionMap, Recording, RecordedEvents, LastEventTime
@@ -483,14 +532,38 @@ EnviarATodasLasVentanas(outputKey, downOrUp) {
 
 ActivarVentana(hwnd) {
     global WindowActivateTimeoutSec
+    static ultimoLogFallo := Map()
+
     if !WinExist("ahk_id " . hwnd)
         return false
+
+    ; Windows bloquea silenciosamente activaciones repetidas y muy seguidas
+    ; ("anti robo de foco") - esto es justo lo que hace este scheduler contra
+    ; varias ventanas. AllowSetForegroundWindow(ASFW_ANY) le pide permiso a
+    ; Windows antes de cada intento para evitar que empiece a ignorarlos tras
+    ; un rato (sintoma reportado: "funciono una vez y despues no").
+    DllCall("AllowSetForegroundWindow", "Int", -1)
     WinActivate("ahk_id " . hwnd)
-    return WinWaitActive("ahk_id " . hwnd, , WindowActivateTimeoutSec) ? true : false
+    exito := WinWaitActive("ahk_id " . hwnd, , WindowActivateTimeoutSec) ? true : false
+
+    if !exito {
+        ahora := A_TickCount
+        ultimaVez := ultimoLogFallo.Has(hwnd) ? ultimoLogFallo[hwnd] : 0
+        if (ahora - ultimaVez > 2000) {
+            try FileAppend(ahora . " ActivarVentana FALLO hwnd=" . hwnd . "`n", A_ScriptDir . "\activar_ventana_debug.log")
+            ultimoLogFallo[hwnd] := ahora
+        }
+    }
+
+    return exito
 }
 ; Activa una ventana y espera a que realmente tenga el foco (con timeout).
 ; Devuelve false si la ventana ya no existe o no llego a activarse a tiempo,
 ; para que quien la llame la reintente en el siguiente ciclo sin romperse.
+; Si falla, deja un registro en activar_ventana_debug.log (maximo uno cada 2s
+; por ventana, para no saturar el archivo si empieza a fallar seguido) - asi
+; se puede confirmar con evidencia si el bloqueo de Windows sigue ocurriendo
+; a pesar del AllowSetForegroundWindow.
 
 ReenviarEstadoCompleto(hwnd) {
     global HeldKeys, TodosLosOutputs

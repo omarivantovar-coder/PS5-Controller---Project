@@ -178,6 +178,34 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 
 ---
 
+## Sprint 7 — Fix: Loop dejaba de responder tras funcionar una vez
+**Estado:** 🔲 En curso — 2026-09-03
+
+- [x] **Hallazgo**: probado contra TM real, el Loop funcionó la primera vez
+      pero dejó de responder en corridas siguientes, sin que el usuario
+      cambiara nada evidente. Hipótesis: la protección "anti robo de foco"
+      de Windows — que bloquea silenciosamente activaciones de ventana
+      repetidas y muy seguidas — probablemente empieza a ignorar los
+      `WinActivate` del scheduler después de un rato, ya que corre muchos
+      por segundo entre varias ventanas.
+- [x] Fix: `ActivarVentana` ahora llama a `AllowSetForegroundWindow(ASFW_ANY)`
+      antes de cada `WinActivate`, que es la forma documentada de pedirle
+      permiso a Windows para evitar ese bloqueo.
+- [x] Diagnóstico: si `WinWaitActive` sigue fallando después del fix, se
+      registra en `activar_ventana_debug.log` (máximo 1 vez cada 2s por
+      ventana, para no saturar el archivo) — así queda evidencia real si el
+      problema persiste, en vez de depender de la memoria de la prueba.
+- [ ] Confirmar en el PC de trabajo si el fix resuelve la intermitencia, o
+      si el log muestra fallos de activación que apunten a otra causa.
+- [x] `ActionMap` ampliado para cubrir **todos** los botones de un control de
+      Xbox, no solo movimiento/cámara/Cross/Circle/Square/Triangle/L1: se
+      agregaron R1, L3, R3, Options (Start), Share (Back), D-Pad completo, y
+      L2/R2 (gatillos analógicos, nueva función `ChequearTrigger` con
+      `XINPUT_TRIGGER_THRESHOLD`). Solo Cross (`L`) sigue confirmado contra
+      TM real - el resto son valores por defecto sin verificar.
+
+---
+
 ## Backlog / ideas sin sprint asignado
 
 - Configuración de `ActionMap` editable desde la UI (sin tocar el script)

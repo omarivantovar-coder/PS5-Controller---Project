@@ -15,10 +15,12 @@ manual repetitivo.
 ## Cómo funciona
 
 1. **Grabar**: mientras "Grabar" está activo, el programa sondea tu control
-   físico de Xbox (botones + ambos sticks) y guarda cada evento con su
-   tiempo real entre pulsaciones. El stick derecho usa flechas como
-   equivalencia por defecto (uso común para cámara) — ajustable en
-   `ActionMap` si tu Target Manager usa otras teclas.
+   físico de Xbox — ambos sticks, ambos gatillos (L2/R2) y todos los botones
+   (Cross/Circle/Square/Triangle, L1/R1, L3/R3, D-Pad, Options, Share) — y
+   guarda cada evento con su tiempo real entre pulsaciones. Solo la
+   equivalencia de Cross (`L`) está confirmada contra un TM real; el resto
+   son valores por defecto — ajustables en `ActionMap` si tu Target Manager
+   usa otras teclas.
 2. **Enlazar ventanas**: marca la casilla de cualquier ventana abierta en la
    lista para enlazarla/desenlazarla como destino.
 3. **Relay en vivo / Loop**: el input (en vivo o grabado) se manda como
