@@ -179,7 +179,7 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
 ---
 
 ## Sprint 7 — Fix: Loop dejaba de responder tras funcionar una vez
-**Estado:** 🔲 En curso — 2026-09-03
+**Estado:** ✅ Completado — 2026-09-03
 
 - [x] **Hallazgo**: probado contra TM real, el Loop funcionó la primera vez
       pero dejó de responder en corridas siguientes, sin que el usuario
@@ -195,8 +195,11 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
       registra en `activar_ventana_debug.log` (máximo 1 vez cada 2s por
       ventana, para no saturar el archivo) — así queda evidencia real si el
       problema persiste, en vez de depender de la memoria de la prueba.
-- [ ] Confirmar en el PC de trabajo si el fix resuelve la intermitencia, o
-      si el log muestra fallos de activación que apunten a otra causa.
+- [x] **Confirmado en el PC de trabajo (2026-09-03)**: con Relay apagado,
+      Keyboard Mapping activo, y usando Grabar → Play Loop (no Relay, que
+      sigue sin funcionar contra TM como era esperado), el Loop mueve el
+      control en el Target Manager real. Primera confirmación end-to-end
+      contra hardware real desde que se armó el scheduler.
 - [x] `ActionMap` ampliado para cubrir **todos** los botones de un control de
       Xbox, no solo movimiento/cámara/Cross/Circle/Square/Triangle/L1: se
       agregaron R1, L3, R3, Options (Start), Share (Back), D-Pad completo, y
