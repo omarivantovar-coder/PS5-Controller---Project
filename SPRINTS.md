@@ -203,6 +203,14 @@ enviada — quedó identificado como problema a resolver en el siguiente sprint.
       L2/R2 (gatillos analógicos, nueva función `ChequearTrigger` con
       `XINPUT_TRIGGER_THRESHOLD`). Solo Cross (`L`) sigue confirmado contra
       TM real - el resto son valores por defecto sin verificar.
+- [x] Margen de seguridad del Loop cambiado de milisegundos a **segundos (2 a
+      5, con decimales)**, a pedido explícito del usuario — default subido a
+      2.5s (el mínimo permitido ahora es 2s, por encima del viejo default de
+      1.5s). Como el rango nuevo permite configurar *por encima* de los ~3s
+      de riesgo real de desconexión (cosa que antes el límite de 2900ms
+      evitaba), se agregó un segundo aviso no bloqueante en
+      `VerificarMargenSeguridad` que avisa si el margen elegido supera ese
+      punto - decisión informada del usuario, no bloqueada por el código.
 
 ---
 

@@ -36,9 +36,12 @@ manual repetitivo.
    Loop no solo reproduce la grabación — también reenvía el estado actual a
    cualquier ventana enlazada que lleve tiempo sin ser visitada, para que
    ninguna se quede "muda" mientras el scheduler atiende a las demás. El
-   margen de seguridad es ajustable en el panel (campo junto a los botones),
-   con un aviso si la cantidad de ventanas enlazadas no alcanza a cubrirse
-   dentro del margen configurado.
+   margen de seguridad es ajustable en el panel, **en segundos, de 2 a 5**
+   (por defecto 2.5s). Hay dos avisos no bloqueantes: si la cantidad de
+   ventanas enlazadas no alcanza a cubrirse dentro del margen configurado, y
+   si el margen elegido supera los ~3s de riesgo real de desconexión (subirlo
+   por encima de eso es una decisión bajo tu propio criterio, no un valor
+   recomendado).
 5. **Macros**: hasta 3 grabaciones con nombre, persistentes en
    `ps5_macros.ini` (sobreviven a cerrar el programa y reiniciar el PC).
    **Grabar ya NO guarda solo** — deja la grabación lista en memoria para

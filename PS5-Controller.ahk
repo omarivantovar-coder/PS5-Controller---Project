@@ -20,9 +20,10 @@ WindowQueues := Map()      ; hwnd -> array de transiciones {key, action} pendien
 LastVisited := Map()       ; hwnd -> A_TickCount de la ultima vez que se le mando algo
 EventIndex := 1            ; indice del proximo evento grabado a disparar
 EventDueTick := 0          ; A_TickCount en el que ese evento vence
-LoopSafetyMarginMs := 1500 ; margen ajustable, bien por debajo de los ~3000ms de riesgo
+LoopSafetyMarginMs := 2500 ; margen ajustable en la UI (2-5s) - default por debajo de los ~3000ms de riesgo
 WindowActivateTimeoutSec := 0.3
 EstimatedWindowVisitMs := 250 ; medido en pruebas locales con 2 ventanas reales (~985ms de ciclo / ~4 visitas)
+MargenRiesgoMs := 2900 ; a partir de aca, el margen configurado ya no da colchon frente al riesgo de ~3000ms
 
 ; ---------- PERSISTENCIA DE MACROS (3 slots con nombre) ----------
 MacrosFile := A_ScriptDir . "\ps5_macros.ini"
@@ -130,8 +131,8 @@ BtnPlay.OnEvent("Click", ReproducirLoop)
 BtnStop := MainGui.Add("Button", "x+10 w120", "⏹ Stop Loop")
 BtnStop.OnEvent("Click", DetenerLoop)
 
-MainGui.Add("Text", "xm y+15", "Margen de seguridad del Loop (ms):")
-EdMargen := MainGui.Add("Edit", "x+5 yp-4 w70", String(LoopSafetyMarginMs))
+MainGui.Add("Text", "xm y+15", "Margen de seguridad del Loop (segundos, 2-5):")
+EdMargen := MainGui.Add("Edit", "x+5 yp-4 w50", String(LoopSafetyMarginMs / 1000))
 EdMargen.OnEvent("Change", ActualizarMargen)
 
 ControllerStatusText := MainGui.Add("Text", "xm y+10 w500", "🎮 Control: buscando...")
@@ -679,34 +680,47 @@ LoopSchedulerTick() {
 ; necesita atencion todavia, espera un poco en vez de girar en vacio.
 
 VerificarMargenSeguridad() {
-    global TargetWindows, LoopSafetyMarginMs, MargenWarningText, EstimatedWindowVisitMs
+    global TargetWindows, LoopSafetyMarginMs, MargenWarningText, EstimatedWindowVisitMs, MargenRiesgoMs
+    avisos := []
+
     presupuestoEstimado := TargetWindows.Count * EstimatedWindowVisitMs
-    if (presupuestoEstimado > LoopSafetyMarginMs) {
-        MargenWarningText.Text := "⚠ " . TargetWindows.Count . " ventanas ≈ " . presupuestoEstimado
+    if (presupuestoEstimado > LoopSafetyMarginMs)
+        avisos.Push("⚠ " . TargetWindows.Count . " ventanas ≈ " . presupuestoEstimado
             . "ms por ciclo completo, pero el margen es " . LoopSafetyMarginMs
-            . "ms - sube el margen o enlaza menos ventanas."
-    } else {
-        MargenWarningText.Text := ""
+            . "ms - sube el margen o enlaza menos ventanas.")
+
+    if (LoopSafetyMarginMs > MargenRiesgoMs)
+        avisos.Push("⚠ Margen por encima de los ~3s de riesgo de desconexion de TM - usalo bajo tu propio criterio.")
+
+    texto := ""
+    for aviso in avisos {
+        if (texto != "")
+            texto .= " | "
+        texto .= aviso
     }
+    MargenWarningText.Text := texto
 }
 ; Compara cuantas ventanas hay enlazadas contra el margen de seguridad
-; configurado (con un estimado de tiempo por visita, no medido) y muestra un
-; aviso no bloqueante si el margen podria quedar corto. Se llama al iniciar
-; el Loop y cada vez que se enlaza/desenlaza una ventana mientras corre.
+; configurado (con un estimado de tiempo por visita, no medido), y tambien si
+; el margen elegido supera MargenRiesgoMs (~3s, el punto donde ya no hay
+; colchon frente al riesgo real de desconexion de TM). Muestra los avisos que
+; apliquen, no bloqueantes. Se llama al iniciar el Loop y cada vez que se
+; enlaza/desenlaza una ventana mientras corre.
 
 ActualizarMargen(ctrl, *) {
     global LoopSafetyMarginMs
-    if !IsInteger(ctrl.Text)
+    if !IsNumber(ctrl.Text)
         return
-    valor := Integer(ctrl.Text)
-    if (valor < 300 || valor > 2900)
+    segundos := Number(ctrl.Text)
+    if (segundos < 2 || segundos > 5)
         return
-    LoopSafetyMarginMs := valor
+    LoopSafetyMarginMs := Round(segundos * 1000)
     VerificarMargenSeguridad()
 }
-; Actualiza el margen de seguridad en vivo desde el campo de texto (valida
-; que sea un numero entero razonable, entre 300 y 2900ms). Aplica de
-; inmediato, incluso a mitad de un Loop corriendo.
+; Actualiza el margen de seguridad en vivo desde el campo de texto, en
+; segundos (2 a 5, con decimales permitidos), y lo convierte a milisegundos
+; para el resto del scheduler. Aplica de inmediato, incluso a mitad de un
+; Loop corriendo.
 
 ReproducirLoop(*) {
     global Looping, RecordedEvents, MainGui, TargetWindows
